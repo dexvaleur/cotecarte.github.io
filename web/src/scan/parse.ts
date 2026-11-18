@@ -69,13 +69,22 @@ export function parseCardNumbers(text: string): ParsedNumber[] {
       }
     }
   }
+  // 2) Barre oblique non lue : « 069159 » ou « 069 159 » (deux nombres de 3 chiffres collés).
+  if (!found.length) {
+    for (const m of text.matchAll(/\b(\d{3})\s?(\d{3})\b/g)) {
+      const num = parseInt(m[1], 10)
+      const total = parseInt(m[2], 10)
+      if (num > 0 && total >= 20) found.push({ num, total, prefix: null, raw: m[1] })
+    }
+  }
+
   // On préfère un numéro « plausible » (≤ total + marge pour les cartes secrètes).
   // Le tri est stable : à égalité, l'ordre de lecture est conservé.
   found.sort((x, y) => plausibility(y) - plausibility(x))
 
-  // 2) Cartes promo : « SVP 085 », « SWSH123 », « SM 210 », « XY 150 », « BW 95 »
-  const promo = /\b(SVP|SWSH|SM|XY|BW|MEP|HGSS|DP)\s?([0-9]{1,3})\b/.exec(text)
-  if (promo) found.push({ num: parseInt(promo[2], 10), total: null, prefix: promo[1], raw: promo[1] + promo[2] })
+  // 3) Cartes promo : « SVP 085 », « SWSH123 », « MEP 013 » (numéro sans total).
+  const promo = /\b(SVP|SWSH|SM|XY|BW|MEP|HGSS|DP)\s?(?:FR\s?)?([0-9]{1,3})\b/i.exec(text)
+  if (promo) found.push({ num: parseInt(promo[2], 10), total: null, prefix: promo[1].toUpperCase(), raw: promo[2] })
 
   const seen = new Set<string>()
   return found.filter((n) => {
@@ -160,17 +169,76 @@ export function levenshtein(a: string, b: string): number {
 }
 
 /**
+ * Ressemblance entre deux mots, de 0 à 1, en cherchant le mot court à l'intérieur du mot long
+ * (« eflonizanre » contient presque « florizarre »). Un écart de longueur coûte un peu.
+ */
+function windowSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  let best = 0
+  for (let o = 0; o + short.length <= long.length; o++) {
+    const d = levenshtein(short, long.slice(o, o + short.length))
+    best = Math.max(best, 1 - d / short.length)
+  }
+  return best * (0.85 + (0.15 * short.length) / long.length)
+}
+
+/**
  * Ressemblance entre le texte lu et un nom de carte, de 0 (rien à voir) à 1 (identique).
- * On compare au début du nom pour ignorer les suffixes (« -ex », « V », « VMAX »).
+ * On ignore les suffixes (« -ex », « V », « VMAX ») et le préfixe « Méga- » : ils sont gérés à part.
  */
 export function nameSimilarity(read: string, cardName: string): number {
   const a = normalize(read).replace(/ /g, '')
-  const full = normalize(cardName).replace(/ /g, '')
-  if (!a || !full) return 0
-  if (full.startsWith(a) || a.startsWith(full)) return Math.min(a.length, full.length) / Math.max(a.length, full.length) * 0.3 + 0.7
-  const b = full.slice(0, Math.max(a.length, 3))
-  const d = levenshtein(a, b)
-  return Math.max(0, 1 - d / Math.max(a.length, b.length))
+  const base = normalize(cardName.replace(/^m[ée]ga[- ]/i, '').replace(/[- ](ex|gx|v|vmax|vstar|v-union)$/i, '')).replace(/ /g, '')
+  if (!a || !base) return 0
+  if (a === base) return 1
+  return windowSimilarity(a, base)
+}
+
+/** Suffixes lus de travers : le logo « ex » est souvent lu « es », « ez », « cx »… */
+const SUFFIX_TAILS: Record<string, string> = { ex: 'ex', es: 'ex', ez: 'ex', cx: 'ex', ax: 'ex', gx: 'gx', v: 'v', vmax: 'vmax', vstar: 'vstar', star: 'vstar' }
+
+export interface SpeciesMatch {
+  name: string
+  score: number
+  /** Suffixe collé au nom (« Mimiquies » → ex) */
+  suffix: string | null
+}
+
+/**
+ * Trouve le nom de Pokémon le plus proche du texte lu, dans une liste de noms connus.
+ * « EFlonizanre » → Florizarre, « Mimiquies » → Mimiqui (+ suffixe ex).
+ */
+export function matchSpecies(read: string, species: string[]): SpeciesMatch | null {
+  const a = normalize(read).replace(/ /g, '')
+  if (a.length < 4) return null
+  let best: SpeciesMatch | null = null
+  for (const name of species) {
+    const n = normalize(name).replace(/ /g, '')
+    if (n.length < 3) continue
+    let score = windowSimilarity(a, n)
+    let suffix: string | null = null
+    // Nom suivi d'un suffixe collé : on compare sans la fin.
+    if (a.length > n.length && a.startsWith(n.slice(0, Math.max(3, n.length - 1)))) {
+      const tail = a.slice(n.length)
+      if (SUFFIX_TAILS[tail]) {
+        score = Math.max(score, levenshtein(a.slice(0, n.length), n) <= 1 ? 0.97 : 0)
+        suffix = SUFFIX_TAILS[tail]
+      }
+    }
+    if (!best || score > best.score) best = { name, score, suffix }
+  }
+  return best && best.score >= 0.72 ? best : null
+}
+
+/** « Méga » écrit avant le nom (cartes Méga-Évolution). */
+export function hasMegaPrefix(text: string): boolean {
+  return /\bm[ée]ga\b/i.test(text)
+}
+
+/** Nombres de 3 chiffres isolés (numéros de cartes promo sans total, ex. « 013 »). */
+export function looseNumbers(text: string): string[] {
+  return [...new Set([...text.matchAll(/\b(\d{3})\b/g)].map((m) => m[1]).filter((n) => n !== '000'))]
 }
 
 /** Compare deux numéros imprimés (« 006 » et « 6 » sont identiques ; « TG05 » et « TG5 » aussi). */

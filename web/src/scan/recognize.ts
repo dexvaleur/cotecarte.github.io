@@ -1,15 +1,21 @@
 import { cardImage, getSet, getSets, searchByName, searchByNumber, setIdOf } from '../api/tcgdex'
 import type { CardBrief } from '../api/types'
 import { band, dHash, hashSimilarity, loadImage } from './image'
-import { readText, type OcrProgress } from './ocr'
+import { readText, readTextWithConfidence, type OcrProgress } from './ocr'
+import { SPECIES } from '../data/species'
 import {
+  hasMegaPrefix,
+  looseNumbers,
+  matchSpecies,
   nameSimilarity,
+  normalize,
   parseCardNumbers,
   parseCopyrightYear,
   parseNameCandidates,
   parseSuffix,
   sameLocalId,
   type ParsedNumber,
+  type SpeciesMatch,
 } from './parse'
 
 /**
@@ -39,40 +45,116 @@ export interface Recognition {
 // Chiffres et « / » seulement : avec des lettres, l'OCR confond « 0 » et « D », « 2 » et « Z »…
 const NUMBER_CHARS = '0123456789/'
 
-export async function recognizeCard(card: HTMLCanvasElement, onProgress?: OcrProgress): Promise<Recognition> {
+/** Noms de Pokémon reconnus dans un texte, du plus sûr au moins sûr. */
+function speciesIn(names: string[]): SpeciesMatch[] {
+  return names
+    .slice(0, 5)
+    .map((n) => matchSpecies(n, SPECIES))
+    .filter((m): m is SpeciesMatch => m !== null)
+    .sort((a, b) => b.score - a.score)
+}
+
+// Mots toujours imprimés en haut d'une carte (dans le bon sens).
+const CARD_WORDS = new Set(['pv', 'hp', 'base', 'basic', 'niveau', 'stage', 'evolution', 'evolves', 'de', 'from', 'vstar', 'vmax', 'mega', 'talent', 'dresseur', 'trainer', 'energie', 'energy', 'objet', 'item', 'supporter', 'stade', 'stadium', 'pokemon'])
+
+/**
+ * Note de « lisibilité » d'un texte lu en haut de carte : sert à savoir si la carte est
+ * dans le bon sens. Un nom de Pokémon, « PV 250 », « Évolution de »… sont bon signe.
+ */
+function textQuality(text: string, confidence: number): number {
+  const found = speciesIn(parseNameCandidates(text))
+  const words = normalize(text).split(' ')
+  const known = Math.min(3, words.filter((w) => CARD_WORDS.has(w)).length)
+  const hp = /\b(PV|HP)\s?\d{2,3}\b|\b\d{2,3}\s?(PV|HP)\b/i.test(text) ? 25 : 0
+  return confidence + (found.length ? 35 * found[0].score : 0) + known * 8 + hp
+}
+
+/**
+ * `views` : une ou plusieurs versions de la carte redressée (ex. dans les deux sens,
+ * quand on ne sait pas où est le haut). On garde celle où l'OCR lit le mieux.
+ */
+export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: OcrProgress): Promise<Recognition> {
   // --- 1. OCR -----------------------------------------------------------
   // Le nom est en haut à gauche ; le numéro en bas à gauche (cartes récentes)
   // ou en bas à droite (anciennes cartes).
-  const topText = await readText(band(card, 0.02, 0.13, 0.03, 0.85), onProgress)
-  let bottomText = await readText(band(card, 0.87, 0.995, 0, 0.55), onProgress, NUMBER_CHARS)
+  let card = views[0]
+  let topText = ''
+  let bestView = -Infinity
+  let presetBottom: string | null = null
+  for (const view of views) {
+    // On lit le haut de la carte ; si aucun nom n'est reconnu, on réessaie avec un seuil adaptatif.
+    const r = await readTextWithConfidence(band(view, 0.02, 0.13, 0.03, 0.85), onProgress)
+    let text = r.text
+    let score = textQuality(text, r.confidence)
+    if (!speciesIn(parseNameCandidates(text)).length) {
+      const a = await readTextWithConfidence(band(view, 0.02, 0.13, 0.03, 0.85, 'adaptive'), onProgress)
+      text += '\n' + a.text
+      score = Math.max(score, textQuality(a.text, a.confidence))
+    }
+    // Si on hésite entre deux sens, le numéro en bas de carte aide à trouver le bon.
+    let bottom: string | null = null
+    if (views.length > 1) {
+      bottom = await readText(band(view, 0.87, 0.995, 0, 0.55), onProgress, NUMBER_CHARS)
+      if (parseCardNumbers(bottom).some((n) => n.total)) score += 40
+    }
+    if (score > bestView) {
+      bestView = score
+      card = view
+      topText = text
+      presetBottom = bottom
+    }
+    // Lecture très claire dans ce sens : inutile d'essayer l'autre.
+    if (score >= 140) break
+  }
+
+  // Numéro : contraste simple, puis seuil adaptatif, puis côté droit (anciennes cartes).
+  let bottomText = presetBottom ?? (await readText(band(card, 0.87, 0.995, 0, 0.55), onProgress, NUMBER_CHARS))
   let numbers = parseCardNumbers(bottomText)
-  if (!numbers.length) {
-    bottomText += '\n' + (await readText(band(card, 0.87, 0.995, 0.45, 1), onProgress, NUMBER_CHARS))
+  for (const [left, right, mode] of [
+    [0, 0.55, 'adaptive'],
+    [0.45, 1, 'contrast'],
+  ] as const) {
+    if (numbers.some((n) => n.total)) break
+    bottomText += '\n' + (await readText(band(card, 0.87, 0.995, left, right, mode), onProgress, NUMBER_CHARS))
     numbers = parseCardNumbers(bottomText)
   }
+
+  // Nom : si aucun nom de Pokémon n'est reconnu, on relit avec un seuil adaptatif
+  // (texte sur un bandeau de couleur), puis en couleurs inversées (texte blanc).
   let names = parseNameCandidates(topText)
-  let suffix = parseSuffix(topText)
-  // Dernière ligne : le copyright (« ©2023 Pokémon… ») donne l'époque de la carte.
+  for (const mode of ['adaptive', 'inverted'] as const) {
+    if (speciesIn(names).length) break
+    const again = await readText(band(card, 0.02, 0.13, 0.03, 0.85, mode), onProgress)
+    topText += '\n' + again
+    names = [...new Set([...names, ...parseNameCandidates(again)])]
+  }
+
+  // Dernière ligne : le copyright (« ©2023 Pokémon… ») donne l'époque ; parfois aussi le numéro promo.
   const footer = await readText(band(card, 0.9, 1, 0, 1), onProgress)
   let year = parseCopyrightYear(footer)
   if (!numbers.length) numbers = parseCardNumbers(footer)
 
   // Plan B : si une zone n'a rien donné, on lit toute la carte.
+  let allText = ''
   if (!numbers.length || names.length === 0) {
-    const all = await readText(band(card, 0, 1), onProgress)
-    if (!numbers.length) numbers = parseCardNumbers(all)
-    year ??= parseCopyrightYear(all)
-    if (names.length === 0) {
-      names = parseNameCandidates(all.split('\n').slice(0, 6).join('\n'))
-      suffix ??= parseSuffix(all)
-    }
+    allText = await readText(band(card, 0, 1), onProgress)
+    if (!numbers.length) numbers = parseCardNumbers(allText)
+    year ??= parseCopyrightYear(allText)
+    if (names.length === 0) names = parseNameCandidates(allText.split('\n').slice(0, 6).join('\n'))
   }
+
+  // Ce qu'on a compris : nom de Pokémon corrigé, suffixe (ex, V…), « Méga », numéros isolés.
+  const species = speciesIn(names)
+  const suffix = parseSuffix(topText) ?? species[0]?.suffix ?? (allText ? parseSuffix(allText) : null)
+  const mega = hasMegaPrefix(topText)
+  const loose = looseNumbers(bottomText + '\n' + footer)
 
   // --- 2. Recherche -------------------------------------------------------
   const pool = new Map<string, CardBrief>()
   let readNumber: ParsedNumber | null = numbers[0] ?? null
   let byNumber: CardBrief[] = []
   for (const n of numbers.slice(0, 3)) {
+    if (n.total === null) continue
     byNumber = await searchByNumber(n.raw, n.total)
     if (byNumber.length) {
       readNumber = n
@@ -81,10 +163,13 @@ export async function recognizeCard(card: HTMLCanvasElement, onProgress?: OcrPro
   }
   byNumber.forEach((c) => pool.set(c.id, c))
 
-  // Recherche par nom : les premières lettres suffisent (résiste aux erreurs de lecture).
-  const words = [...new Set(names.map((n) => n.split(' ')[0]).filter((w) => w.length >= 3))].slice(0, 2)
-  for (const word of words) {
-    const found = await searchByName(word.slice(0, Math.min(word.length, 6)))
+  // Recherche par nom : d'abord les noms de Pokémon reconnus (orthographe exacte),
+  // sinon les premières lettres du texte lu (résiste aux erreurs de lecture).
+  const queries = species.length
+    ? [...new Set(species.map((m) => m.name))].slice(0, 2)
+    : [...new Set(names.map((n) => n.split(' ')[0]).filter((w) => w.length >= 3))].slice(0, 2).map((w) => w.slice(0, 6))
+  for (const q of queries) {
+    const found = await searchByName(q)
     found.forEach((c) => pool.set(c.id, c))
   }
 
@@ -93,7 +178,11 @@ export async function recognizeCard(card: HTMLCanvasElement, onProgress?: OcrPro
   const sets = await getSets('fr').catch(() => [])
   const recency = new Map(sets.map((s, i) => [s.id, i / Math.max(1, sets.length - 1)]))
   const candidates: Candidate[] = [...pool.values()].map((c) => {
-    const nameScore = names.length ? Math.max(...names.map((n) => nameSimilarity(n, c.name))) : 0
+    const nameScore = Math.max(
+      0,
+      ...names.map((n) => nameSimilarity(n, c.name)),
+      ...species.map((m) => m.score * nameSimilarity(m.name, c.name)),
+    )
     const fromNumberSearch = byNumber.some((b) => b.id === c.id)
     // Le numéro « colle » seulement si le total correspond aussi à l'extension
     // (sauf cartes promo, qui n'ont pas de total).
@@ -101,15 +190,24 @@ export async function recognizeCard(card: HTMLCanvasElement, onProgress?: OcrPro
       readNumber !== null &&
       sameLocalId(c.localId, readNumber.raw) &&
       (fromNumberSearch || readNumber.total === null)
+    const looseMatch = !numberMatch && loose.some((n) => sameLocalId(c.localId, n))
     const cardSuffix = parseSuffix(' ' + c.name.replace(/-/g, ' '))
     const suffixBonus = suffix && cardSuffix === suffix ? 0.4 : suffix && !cardSuffix ? -0.2 : 0
+    const cardMega = /^m[ée]ga[- ]/i.test(c.name)
+    const megaBonus = mega && cardMega ? 0.5 : mega && !cardMega ? -0.3 : 0
     const recent = (recency.get(setIdOf(c.id)) ?? 0) * 0.3
-    const score = nameScore * 2 + (numberMatch ? 1.5 : 0) + (fromNumberSearch ? 1 : 0) + suffixBonus + recent
-    return { ...c, score, nameScore, numberMatch, imageScore: null }
+    const score =
+      nameScore * 2 +
+      (numberMatch ? 1.5 : looseMatch ? 0.8 : 0) +
+      (fromNumberSearch ? 1 : 0) +
+      suffixBonus +
+      megaBonus +
+      recent
+    return { ...c, score, nameScore, numberMatch: numberMatch || looseMatch, imageScore: null }
   })
   candidates.sort((a, b) => b.score - a.score)
 
-  // On garde les meilleurs, puis on compare les images pour les départager.
+  // On garde les meilleurs, puis on compare époque et images pour les départager.
   const best = candidates.filter((c) => c.score >= 1).slice(0, 10)
   if (year) await compareYears(year, best)
   await compareImages(card, best)
@@ -123,10 +221,24 @@ export async function recognizeCard(card: HTMLCanvasElement, onProgress?: OcrPro
       (first.nameScore >= 0.85 && (first.imageScore ?? 0) >= 0.85 && gap >= 1))
 
   // Infos de diagnostic, consultables dans la console du navigateur (window.__pokecardScan).
-  ;(globalThis as Record<string, unknown>).__pokecardScan = { topText, bottomText, footer, year, names, suffix, numbers, candidates: best }
+  ;(globalThis as Record<string, unknown>).__pokecardScan = {
+    cardPreview: card.toDataURL('image/jpeg', 0.7),
+    topText,
+    bottomText,
+    footer,
+    year,
+    names,
+    species,
+    suffix,
+    mega,
+    loose,
+    numbers,
+    candidates: best,
+  }
 
+  const shownName = species[0]?.name ?? names[0]
   return {
-    readName: names[0] ? names[0] + (suffix ? ` ${suffix}` : '') : null,
+    readName: shownName ? `${mega ? 'Méga-' : ''}${shownName}${suffix ? ` ${suffix}` : ''}` : null,
     readNumber,
     candidates: best,
     confident,

@@ -1,4 +1,6 @@
 // Outils de traitement d'image (dans le navigateur, avec <canvas>).
+import { locateCard } from './locate'
+import { adaptiveThreshold } from './threshold'
 
 /** Ratio officiel d'une carte Pokémon : 63 mm × 88 mm. */
 export const CARD_RATIO = 63 / 88
@@ -13,7 +15,7 @@ export function makeCanvas(w: number, h: number): HTMLCanvasElement {
 /** Charge un fichier image (galerie) dans un canvas, en tenant compte de la rotation EXIF. */
 export async function fileToCanvas(file: File): Promise<HTMLCanvasElement> {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height))
+  const scale = Math.min(1, 2400 / Math.max(bmp.width, bmp.height))
   const c = makeCanvas(bmp.width * scale, bmp.height * scale)
   c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height)
   bmp.close()
@@ -36,69 +38,66 @@ export function cropToCard(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /**
- * Détecte la carte dans une photo (posée sur une table, un tapis…).
- * Principe : on estime la couleur du fond grâce aux bords de la photo, puis on cherche
- * le rectangle où les pixels sont différents du fond.
- * Renvoie la carte recadrée, ou null si on n'a rien trouvé de convaincant.
+ * Trouve la carte dans une photo et la redresse (voir locate.ts).
+ * Renvoie deux versions : la carte dans le sens trouvé, et retournée à 180°
+ * (on ne sait pas encore où est le haut ; l'OCR choisira). null si rien trouvé.
  */
-export function detectCard(src: HTMLCanvasElement, minArea = 0.2): HTMLCanvasElement | null {
-  const W = 240
-  const scale = W / src.width
+export function findCard(src: HTMLCanvasElement, minQuality = 0.5): HTMLCanvasElement[] | null {
+  const scale = Math.min(1, 360 / Math.max(src.width, src.height))
+  const W = Math.round(src.width * scale)
   const H = Math.round(src.height * scale)
   const small = makeCanvas(W, H)
   const ctx = small.getContext('2d', { willReadFrequently: true })!
   ctx.drawImage(src, 0, 0, W, H)
-  const d = ctx.getImageData(0, 0, W, H).data
+  const box = locateCard(ctx.getImageData(0, 0, W, H).data, W, H)
+  if (!box || box.quality < minQuality) return null
 
-  // 1. Couleur du fond = médiane des pixels du pourtour (3 % de chaque côté).
-  const border: number[][] = []
-  const m = Math.max(2, Math.round(Math.min(W, H) * 0.03))
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++)
-      if (x < m || y < m || x >= W - m || y >= H - m) {
-        const i = (y * W + x) * 4
-        border.push([d[i], d[i + 1], d[i + 2]])
-      }
-  const med = [0, 1, 2].map((k) => border.map((p) => p[k]).sort((a, b) => a - b)[border.length >> 1])
+  // Dimensions dans l'image d'origine.
+  const cx = box.cx / scale
+  const cy = box.cy / scale
+  const w = box.w / scale
+  const h = box.h / scale
+  const outW = Math.min(1000, Math.round(w))
+  const outH = Math.round(outW / CARD_RATIO)
 
-  // 2. Pixels « différents du fond », comptés par ligne et par colonne.
-  const rows = new Array<number>(H).fill(0)
-  const cols = new Array<number>(W).fill(0)
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4
-      const dist = Math.abs(d[i] - med[0]) + Math.abs(d[i + 1] - med[1]) + Math.abs(d[i + 2] - med[2])
-      if (dist > 70) {
-        rows[y]++
-        cols[x]++
-      }
-    }
-
-  // 3. La carte = lignes et colonnes majoritairement « différentes ».
-  const top = rows.findIndex((v) => v > W * 0.3)
-  const bottom = H - 1 - [...rows].reverse().findIndex((v) => v > W * 0.3)
-  const left = cols.findIndex((v) => v > H * 0.3)
-  const right = W - 1 - [...cols].reverse().findIndex((v) => v > H * 0.3)
-  if (top < 0 || left < 0 || bottom <= top || right <= left) return null
-
-  const bw = right - left + 1
-  const bh = bottom - top + 1
-  const ratio = bw / bh
-  const area = (bw * bh) / (W * H)
-  if (ratio < CARD_RATIO * 0.8 || ratio > CARD_RATIO * 1.25 || area < minArea || area > 0.97) return null
-
-  const sx = left / scale
-  const sy = top / scale
-  const out = makeCanvas(Math.min(bw / scale, 1000), Math.min(bw / scale, 1000) / CARD_RATIO)
-  out.getContext('2d')!.drawImage(src, sx, sy, bw / scale, bh / scale, 0, 0, out.width, out.height)
-  return out
+  const draw = (sign: 1 | -1) => {
+    const out = makeCanvas(outW, outH)
+    const o = out.getContext('2d')!
+    // Axe vertical de la sortie = grand côté de la carte ; axe horizontal = petit côté.
+    const ux = box.ux * sign
+    const uy = box.uy * sign
+    const vx = uy // vecteur perpendiculaire (sens direct, pas de miroir)
+    const vy = -ux
+    const sx = outW / w
+    const sy = outH / h
+    o.setTransform(sx * vx, sy * ux, sx * vy, sy * uy, outW / 2 - sx * (vx * cx + vy * cy), outH / 2 - sy * (ux * cx + uy * cy))
+    o.imageSmoothingQuality = 'high'
+    o.drawImage(src, 0, 0)
+    return out
+  }
+  return [draw(1), draw(-1)]
 }
 
 /**
  * Découpe une bande horizontale de la carte (en %), l'agrandit et augmente
  * le contraste en noir et blanc : l'OCR lit beaucoup mieux ainsi.
  */
-export function band(src: HTMLCanvasElement, top: number, bottom: number, left = 0, right = 1): HTMLCanvasElement {
+/**
+ * Préparation de l'image pour l'OCR :
+ * - « contrast » : niveaux de gris, contraste étiré (Tesseract choisit ensuite son seuil) ;
+ * - « adaptive » : noir et blanc avec un seuil local (texte sur bandeau de couleur) ;
+ * - « inverted » : comme « contrast », couleurs inversées (texte clair sur fond foncé).
+ */
+export type BandMode = 'contrast' | 'adaptive' | 'inverted'
+
+export function band(
+  src: HTMLCanvasElement,
+  top: number,
+  bottom: number,
+  left = 0,
+  right = 1,
+  mode: BandMode = 'contrast',
+): HTMLCanvasElement {
   const sx = src.width * left
   const sy = src.height * top
   const sw = src.width * (right - left)
@@ -108,27 +107,33 @@ export function band(src: HTMLCanvasElement, top: number, bottom: number, left =
   const ctx = c.getContext('2d', { willReadFrequently: true })!
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height)
-  enhance(ctx, c.width, c.height)
+  enhance(ctx, c.width, c.height, mode)
   return c
 }
 
-/** Niveaux de gris + étirement du contraste. */
-function enhance(ctx: CanvasRenderingContext2D, w: number, h: number) {
+/** Niveaux de gris, puis contraste étiré ou seuil adaptatif selon le mode. */
+function enhance(ctx: CanvasRenderingContext2D, w: number, h: number, mode: BandMode) {
   const img = ctx.getImageData(0, 0, w, h)
   const d = img.data
+  const gray = new Float32Array(w * h)
   let min = 255
   let max = 0
-  for (let i = 0; i < d.length; i += 4) {
-    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-    d[i] = g
+  for (let i = 0; i < gray.length; i++) {
+    const g = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]
+    gray[i] = g
     if (g < min) min = g
     if (g > max) max = g
   }
-  const range = Math.max(1, max - min)
-  for (let i = 0; i < d.length; i += 4) {
-    const v = ((d[i] - min) / range) * 255
-    d[i] = d[i + 1] = d[i + 2] = v
+  if (mode === 'adaptive') {
+    adaptiveThreshold(gray, w, h, Math.max(8, Math.round(Math.min(w, h) / 6)))
+  } else {
+    const range = Math.max(1, max - min)
+    for (let i = 0; i < gray.length; i++) {
+      const v = ((gray[i] - min) / range) * 255
+      gray[i] = mode === 'inverted' ? 255 - v : v
+    }
   }
+  for (let i = 0; i < gray.length; i++) d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = gray[i]
   ctx.putImageData(img, 0, 0)
 }
 

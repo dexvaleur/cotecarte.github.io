@@ -39,11 +39,20 @@ function getWorker(): Promise<Worker> {
  * `allowed` limite les caractères reconnus (ex. chiffres et « / » pour le numéro).
  */
 export async function readText(img: HTMLCanvasElement, onProgress?: OcrProgress, allowed = ''): Promise<string> {
+  return (await readTextWithConfidence(img, onProgress, allowed)).text
+}
+
+/** Comme readText, avec en plus la confiance de l'OCR (0 à 100). */
+export async function readTextWithConfidence(
+  img: HTMLCanvasElement,
+  onProgress?: OcrProgress,
+  allowed = '',
+): Promise<{ text: string; confidence: number }> {
   progressListener = onProgress ?? null
   const worker = await getWorker()
   await worker.setParameters({ tessedit_char_whitelist: allowed })
   const { data } = await worker.recognize(img)
-  return data.text
+  return { text: data.text, confidence: data.confidence }
 }
 
 /** Précharge le moteur OCR (appelé quand on ouvre la caméra, pour gagner du temps). */

@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  hasMegaPrefix,
+  looseNumbers,
+  matchSpecies,
   nameSimilarity,
   parseCardNumber,
   parseCardNumbers,
@@ -89,4 +92,40 @@ test('numéros équivalents', () => {
   assert.ok(sameLocalId('006', '6'))
   assert.ok(sameLocalId('TG05', 'TG5'))
   assert.ok(!sameLocalId('16', '6'))
+})
+
+// Cas tirés de vraies photos de cartes.
+const SPECIES = ['Bulbizarre', 'Herbizarre', 'Florizarre', 'Mimiqui', 'Farfaduvet', 'Pikachu', 'Dracaufeu']
+
+test('vraie photo : « EFlonizanre » → Florizarre', () => {
+  assert.equal(matchSpecies('EFlonizanre', SPECIES)?.name, 'Florizarre')
+})
+
+test('vraie photo : « Mimiquies » → Mimiqui + suffixe ex', () => {
+  const m = matchSpecies('Mimiquies', SPECIES)
+  assert.equal(m?.name, 'Mimiqui')
+  assert.equal(m?.suffix, 'ex')
+})
+
+test('pas de faux nom sur du bruit', () => {
+  assert.equal(matchSpecies('SWISA', SPECIES), null)
+})
+
+test('vraie photo : numéro sans barre « 069159 »', () => {
+  const n = parseCardNumber('2 4 30\n0\n069159\n0')
+  assert.equal(n?.num, 69)
+  assert.equal(n?.total, 159)
+})
+
+test('promo MEP sans total', () => {
+  const n = parseCardNumber('MEP FR 013')
+  assert.equal(n?.raw, '013')
+  assert.equal(n?.total, null)
+  assert.deepEqual(looseNumbers('4\n1 4\n013\n222'), ['013', '222'])
+})
+
+test('préfixe Méga et noms avec suffixes', () => {
+  assert.ok(hasMegaPrefix('VEAU. EFlonizanre @X Méga,'))
+  assert.ok(nameSimilarity('Florizarre', 'Méga-Florizarre-ex') === 1)
+  assert.ok(nameSimilarity('Mimiqui', 'Mimiqui-ex') === 1)
 })

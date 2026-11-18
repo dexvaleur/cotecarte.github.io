@@ -6,7 +6,7 @@ import { CameraCapture } from '../components/CameraCapture'
 import { CardThumb, useSetNames } from '../components/CardThumb'
 import { Card, ScreenTitle } from '../components/ui'
 import { useOnline } from '../lib/useOnline'
-import { canvasToDataUrl, cropToCard, detectCard, fileToCanvas } from '../scan/image'
+import { canvasToDataUrl, cropToCard, fileToCanvas, findCard } from '../scan/image'
 import { warmUpOcr } from '../scan/ocr'
 import { type Recognition, recognizeCard } from '../scan/recognize'
 
@@ -30,11 +30,11 @@ export function ScannerScreen() {
   const navigate = useNavigate()
   const online = useOnline()
 
-  async function analyze(card: HTMLCanvasElement) {
-    const preview = canvasToDataUrl(card)
+  async function analyze(views: HTMLCanvasElement[]) {
+    const preview = canvasToDataUrl(views[0])
     setPhase({ name: 'analyzing', preview, step: 'Préparation…' })
     try {
-      const rec = await recognizeCard(card, (p) => {
+      const rec = await recognizeCard(views, (p) => {
         const step = p.status.includes('load') ? 'Chargement du lecteur de texte…' : 'Lecture du nom et du numéro…'
         setPhaseState((cur) => (cur.name === 'analyzing' && cur.step !== step ? { ...cur, step } : cur))
       })
@@ -65,7 +65,7 @@ export function ScannerScreen() {
     try {
       const canvas = await fileToCanvas(file)
       // On cherche la carte dans la photo ; sinon on recadre simplement au centre.
-      await analyze(detectCard(canvas) ?? cropToCard(canvas))
+      await analyze(findCard(canvas) ?? [cropToCard(canvas)])
     } catch {
       setPhase({ name: 'error', message: 'Impossible d’ouvrir cette image. Essaie une photo JPEG ou PNG.' })
     }
@@ -85,7 +85,7 @@ export function ScannerScreen() {
             pickFile()
           }}
           // Si la carte ne remplit pas tout le cadre, on affine le recadrage.
-          onCapture={(c) => void analyze(detectCard(c, 0.5) ?? c)}
+          onCapture={(c) => void analyze(findCard(c, 0.6) ?? [c])}
         />
       )}
 
