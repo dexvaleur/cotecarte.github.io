@@ -34,6 +34,15 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
   const hashCode = (email: string, code: string) => fingerprint(config.AUTH_SECRET, `code:${email}:${code}`)
   const hashToken = (token: string) => fingerprint(config.AUTH_SECRET, `session:${token}`)
 
+  // Accès privé (ALLOWED_EMAILS) : seules ces adresses peuvent se connecter.
+  const allowed = new Set(
+    config.ALLOWED_EMAILS.split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  const isAllowed = (email: string) => allowed.size === 0 || allowed.has(email)
+  const PRIVATE_MESSAGE = 'Poké Card est en accès privé pour le moment. Tu peux quand même scanner tes cartes sans compte.'
+
   // Pour chaque requête : si un jeton valide est fourni, on sait qui est l'utilisateur.
   app.decorateRequest('user', null)
   app.addHook('onRequest', async (req) => {
@@ -51,6 +60,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
     const parsed = z.object({ email: emailSchema }).safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Adresse email invalide.' })
     const { email } = parsed.data
+    if (!isAllowed(email)) return reply.code(403).send({ error: PRIVATE_MESSAGE })
 
     const [{ count }] = await db.query<{ count: number }>(
       `SELECT count(*)::int AS count FROM login_codes WHERE email = $1 AND created_at > now() - interval '1 hour'`,
@@ -80,6 +90,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
     const parsed = z.object({ email: emailSchema, code: z.string().trim().regex(/^\d{6}$/) }).safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Le code contient 6 chiffres.' })
     const { email, code } = parsed.data
+    if (!isAllowed(email)) return reply.code(403).send({ error: PRIVATE_MESSAGE })
 
     const [row] = await db.query<{ id: number; code_hash: string; attempts: number }>(
       `SELECT id, code_hash, attempts FROM login_codes

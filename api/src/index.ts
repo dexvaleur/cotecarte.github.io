@@ -15,6 +15,8 @@ const app = await buildApp({ db, config, mailer })
 if (applied.length) app.log.info(`Migrations appliquées : ${applied.join(', ')}`)
 if (!config.DATABASE_URL) app.log.info(`Base locale PGlite dans ${config.PGLITE_DIR}`)
 if (mailer.console) app.log.info('Emails désactivés : les codes de connexion s’affichent ici.')
+const allowedCount = config.ALLOWED_EMAILS.split(',').filter((e) => e.trim()).length
+app.log.info(allowedCount ? `Accès privé : ${allowedCount} email(s) autorisé(s).` : 'Accès ouvert : tout le monde peut créer un compte.')
 
 const stopJobs = startJobs(db, config, (m) => app.log.info(m))
 await app.listen({ port: config.PORT, host: config.HOST })

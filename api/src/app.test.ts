@@ -281,3 +281,24 @@ describe('cartes, cache et prix', () => {
     assert.equal(rows.length, 1)
   })
 })
+
+describe('accès privé', () => {
+  test('seuls les emails autorisés peuvent se connecter', async () => {
+    const db2 = await createDb(undefined)
+    await migrate(db2)
+    const app2 = await buildApp({
+      db: db2,
+      config: loadConfig({ NODE_ENV: 'test', AUTH_SECRET: 'secret-de-test-assez-long', ALLOWED_EMAILS: ' Moi@Example.com , ami@example.com' }),
+      mailer,
+    })
+    const refused = await app2.inject({ method: 'POST', url: '/auth/request', payload: { email: 'inconnu@example.com' } })
+    assert.equal(refused.statusCode, 403)
+    assert.match(refused.json().error, /accès privé/)
+    const ok = await app2.inject({ method: 'POST', url: '/auth/request', payload: { email: 'moi@example.com' } })
+    assert.equal(ok.statusCode, 200)
+    const v = await app2.inject({ method: 'POST', url: '/auth/verify', payload: { email: 'moi@example.com', code: ok.json().devCode } })
+    assert.equal(v.statusCode, 200)
+    await app2.close()
+    await db2.close()
+  })
+})
