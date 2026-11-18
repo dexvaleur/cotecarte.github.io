@@ -1,0 +1,24 @@
+# Configuration Render (hébergeur du serveur). Render la lit automatiquement
+# si tu crées le service avec « New → Blueprint ».
+services:
+  - type: web
+    name: pokecard-api
+    runtime: node
+    plan: free
+    rootDir: api
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WEB_ORIGIN
+        value: https://ilyas-celldtyjdy.github.io
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        sync: false
