@@ -48,9 +48,19 @@ export function CardImage({
       alt={alt}
       loading="lazy"
       onError={() => setAttempt((a) => a + 1)}
+      onLoad={(e) => {
+        // pokemontcg.io renvoie un dos de carte (640×892) quand il n'a pas l'image : on le traite comme une absence.
+        const img = e.currentTarget
+        if (isCardBack(img.naturalWidth, img.naturalHeight)) setAttempt((a) => a + 1)
+      }}
       className={`aspect-[63/88] w-full rounded-[5%] bg-surface-2 object-cover ${className}`}
     />
   )
+}
+
+/** Dos de carte renvoyé par pokemontcg.io à la place d'une image manquante. */
+export function isCardBack(width: number, height: number): boolean {
+  return width === 640 && height === 892
 }
 
 /** Noms des extensions (« sv03.5 » → « 151 »), chargés une fois. */
