@@ -16,6 +16,11 @@ const schema = z.object({
   WEB_ORIGIN: z.string().default('http://localhost:5173,http://localhost:4173'),
   /** Secret pour signer les codes : une longue phrase aléatoire, à garder privée. */
   AUTH_SECRET: z.string().min(16).default('change-moi-en-production-avec-une-longue-phrase'),
+  /**
+   * Accès privé : emails autorisés à se connecter, séparés par des virgules.
+   * Vide = tout le monde peut créer un compte.
+   */
+  ALLOWED_EMAILS: z.string().default(''),
   /** Envoi des emails. Vide = les codes s'affichent dans le terminal (développement). */
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('Poké Card <no-reply@pokecard.local>'),
