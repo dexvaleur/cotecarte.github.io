@@ -36,6 +36,8 @@ export interface Candidate extends CardBrief {
 }
 
 export interface Recognition {
+  /** Image de la carte réellement analysée (redressée, dans le sens retenu) */
+  preview: string
   readName: string | null
   readNumber: ParsedNumber | null
   candidates: Candidate[]
@@ -82,15 +84,16 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   let topText = ''
   let bestView = -Infinity
   let presetBottom: string | null = null
-  for (const view of views) {
+  for (const [index, view] of views.entries()) {
     // On lit le haut de la carte ; si aucun nom n'est reconnu, on réessaie avec un seuil adaptatif.
     const r = await readTextWithConfidence(band(view, 0.02, 0.13, 0.03, 0.85), onProgress)
     let text = r.text
-    let score = textQuality(text, r.confidence)
+    // Petit avantage au sens de la photo (la 1re version) : il faut un indice net pour retourner la carte.
+    let score = textQuality(text, r.confidence) + (index === 0 ? 20 : 0)
     if (!speciesIn(parseNameCandidates(text)).length) {
       const a = await readTextWithConfidence(band(view, 0.02, 0.13, 0.03, 0.85, 'adaptive'), onProgress)
       text += '\n' + a.text
-      score = Math.max(score, textQuality(a.text, a.confidence))
+      score = Math.max(score, textQuality(a.text, a.confidence) + (index === 0 ? 20 : 0))
     }
     // Si on hésite entre deux sens, le numéro en bas de carte aide à trouver le bon.
     let bottom: string | null = null
@@ -197,10 +200,13 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     const cardMega = /^m[ée]ga[- ]/i.test(c.name)
     const megaBonus = mega && cardMega ? 0.5 : mega && !cardMega ? -0.3 : 0
     const recent = (recency.get(setIdOf(c.id)) ?? 0) * 0.3
+    // Le numéro compte d'autant plus que le nom concorde : un numéro mal lu ne doit pas
+    // faire passer devant une carte au nom sans rapport (ex. « 143/117 » lu à la place de « 013/172 »).
+    const agree = 0.3 + 0.7 * nameScore
     const score =
-      nameScore * 2 +
-      (numberMatch ? 1.5 : looseMatch ? 0.8 : 0) +
-      (fromNumberSearch ? 1 : 0) +
+      nameScore * 2.5 +
+      (numberMatch ? 1.5 : looseMatch ? 0.8 : 0) * agree +
+      (fromNumberSearch ? 1 : 0) * agree +
       suffixBonus +
       megaBonus +
       recent
@@ -239,6 +245,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
 
   const shownName = species[0]?.name ?? names[0]
   return {
+    preview: card.toDataURL('image/jpeg', 0.8),
     readName: shownName ? `${mega ? 'Méga-' : ''}${shownName}${suffix ? ` ${suffix}` : ''}` : null,
     readNumber,
     candidates: best,
