@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router'
 import { AppShell } from './components/AppShell'
 import { CardScreen } from './screens/CardScreen'
 import { SearchScreen } from './screens/SearchScreen'
+import { SetScreen } from './screens/SetScreen'
 import { load, save } from './lib/storage'
 import { CollectionScreen } from './screens/CollectionScreen'
 import { GlossaryScreen } from './screens/GlossaryScreen'
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="glossaire" element={<GlossaryScreen />} />
         <Route path="recherche" element={<SearchScreen />} />
         <Route path="carte/:id" element={<CardScreen />} />
+        <Route path="collection/extension/:setId" element={<SetScreen />} />
         <Route path="*" element={<Navigate to="/scanner" replace />} />
       </Route>
     </Routes>

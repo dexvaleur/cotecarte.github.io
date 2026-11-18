@@ -29,6 +29,10 @@ export function PriceChart({ points }: { points: PricePoint[] }) {
   const ticks = [min, (min + max) / 2, max]
   const path = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')
   const shown = active ?? points.length - 1
+  // Largeur de la zone de toucher de chaque point.
+  const hit = Math.max(8, Math.min(48, (W - pad.l - pad.r) / (points.length - 1)))
+  // Avec beaucoup de points, des marqueurs plus petits.
+  const r = points.length > 12 ? 2.5 : 4
 
   return (
     <figure className="relative">
@@ -42,11 +46,14 @@ export function PriceChart({ points }: { points: PricePoint[] }) {
             </text>
           </g>
         ))}
-        {points.map((p, i) => (
-          <text key={p.label} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="var(--color-muted)">
-            {p.label}
-          </text>
-        ))}
+        {points.map((p, i) =>
+          // Beaucoup de points : on n'écrit que le premier, le milieu et le dernier.
+          points.length <= 6 || i === 0 || i === points.length - 1 || i === Math.floor((points.length - 1) / 2) ? (
+            <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="var(--color-muted)">
+              {p.label}
+            </text>
+          ) : null,
+        )}
 
         {active !== null && (
           <line x1={x(active)} x2={x(active)} y1={pad.t} y2={H - pad.b} stroke="var(--color-muted)" strokeDasharray="3 3" />
@@ -54,22 +61,22 @@ export function PriceChart({ points }: { points: PricePoint[] }) {
         <path d={path} fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, i) => (
           <circle
-            key={p.label}
+            key={i}
             cx={x(i)}
             cy={y(p.value)}
-            r={i === shown ? 5 : 4}
+            r={i === shown ? r + 1.5 : r}
             fill="var(--color-primary)"
             stroke="var(--color-surface)"
             strokeWidth="2"
           />
         ))}
         {/* Zones de toucher, plus larges que les points */}
-        {points.map((p, i) => (
+        {points.map((_, i) => (
           <rect
-            key={p.label}
-            x={x(i) - 24}
+            key={i}
+            x={x(i) - hit / 2}
             y={0}
-            width={48}
+            width={hit}
             height={H}
             fill="transparent"
             onPointerEnter={() => setActive(i)}

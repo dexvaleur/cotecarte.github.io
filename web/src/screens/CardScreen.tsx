@@ -12,6 +12,7 @@ import { CONDITIONS, generationOf, rarityInfo, typeColor } from '../data/cardInf
 import { addToCollection, toggleWish, useCollectionState } from '../lib/collection'
 import { formatDate, formatEur, formatEurCompact, formatUsd, timeAgo } from '../lib/format'
 import { cardmarketRows, change30d, chartPoints, type PriceRow, refPriceEur, tcgplayerRows } from '../lib/prices'
+import { usePriceHistory } from '../lib/useCardPrices'
 
 type Load =
   | { status: 'loading' }
@@ -94,9 +95,11 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       cardId: card.id,
       name: card.name,
       image: card.image,
+      setId: setInfo.id,
       setName: setInfo.name,
       localId: card.localId,
       rarity: card.rarity,
+      types: card.types,
       condition: grade ?? 'NM',
       priceEur: ref,
     })
@@ -281,7 +284,10 @@ function Change({ card }: { card: Card }) {
 function Prices({ card }: { card: Card }) {
   const cm = cardmarketRows(card)
   const tp = tcgplayerRows(card)
-  const pts = chartPoints(card)
+  const history = usePriceHistory(card.id)
+  // Historique jour par jour (notre serveur) dès qu'on a au moins 5 jours, sinon les moyennes.
+  const daily = history.length >= 5
+  const pts = daily ? history : chartPoints(card)
   if (!cm.length && !tp.length) {
     return (
       <Box>
@@ -295,10 +301,14 @@ function Prices({ card }: { card: Card }) {
       <h2 className="font-bold">Prix</h2>
       {pts.length >= 2 && (
         <div className="mt-2">
-          <p className="text-sm font-semibold text-muted">Évolution du prix moyen (Cardmarket)</p>
+          <p className="text-sm font-semibold text-muted">
+            {daily ? `Prix jour par jour, ${history.length} derniers jours (Cardmarket)` : 'Évolution du prix moyen (Cardmarket)'}
+          </p>
           <PriceChart points={pts} />
           <p className="text-xs text-muted">
-            Moyennes des ventes sur 30 jours, 7 jours et la veille. L’historique jour par jour arrivera avec ton compte.
+            {daily
+              ? 'Prix de tendance relevé chaque jour par Poké Card.'
+              : 'Moyennes des ventes sur 30 jours, 7 jours et la veille. La courbe jour par jour se remplit au fil des jours.'}
           </p>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
+import { AccountPanel } from '../components/AccountPanel'
 import { Card, ScreenTitle } from '../components/ui'
 import { type ThemeChoice, useTheme } from '../lib/theme'
 
@@ -36,8 +37,8 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
       </Card>
 
       <Card className="mt-4">
-        <h2 className="mb-1 font-bold">Compte</h2>
-        <p className="text-muted">La connexion par email arrive avec la collection (étape 3).</p>
+        <h2 className="mb-2 font-bold">Compte</h2>
+        <AccountPanel />
       </Card>
 
       <Card className="mt-4">

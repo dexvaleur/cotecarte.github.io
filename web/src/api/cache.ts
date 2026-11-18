@@ -50,7 +50,7 @@ async function writeDisk(key: string, entry: Entry) {
 }
 
 /** Télécharge un JSON en utilisant le cache si la copie a moins de `ttlMs` millisecondes. */
-export function cachedJson<T>(url: string, ttlMs: number): Promise<Cached<T>> {
+export function cachedJson<T>(url: string, ttlMs: number, fallbackUrl?: string): Promise<Cached<T>> {
   const pending = inflight.get(url)
   if (pending) return pending as Promise<Cached<T>>
 
@@ -63,7 +63,15 @@ export function cachedJson<T>(url: string, ttlMs: number): Promise<Cached<T>> {
     }
 
     try {
-      const res = await fetch(url)
+      let res: Response
+      try {
+        res = await fetch(url)
+        if (!res.ok && res.status !== 404 && fallbackUrl) throw new Error('relais en panne')
+      } catch (err) {
+        // Notre serveur ne répond pas : on essaie directement la source (TCGdex).
+        if (!fallbackUrl) throw err
+        res = await fetch(fallbackUrl)
+      }
       if (res.status === 404) throw new ApiError('notfound')
       if (!res.ok) throw new ApiError('unavailable')
       const data = (await res.json()) as T

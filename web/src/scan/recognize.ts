@@ -3,6 +3,7 @@ import type { CardBrief } from '../api/types'
 import { band, dHash, hashSimilarity, loadImage } from './image'
 import { readText, readTextWithConfidence, type OcrProgress } from './ocr'
 import { SPECIES } from '../data/species'
+import { API_URL } from '../lib/api'
 import {
   hasMegaPrefix,
   looseNumbers,
@@ -269,9 +270,9 @@ async function compareYears(year: number, list: Candidate[]) {
  * Adresse du serveur qui relaie les images (étape 3).
  * Le serveur d'images de TCGdex envoie son en-tête d'autorisation CORS en double :
  * le navigateur affiche les images mais interdit de les analyser. Notre serveur
- * relaiera donc les images avec un en-tête correct. Sans lui, on saute cette étape.
+ * les relaie avec un en-tête correct (route /img). Sans serveur, on saute cette étape.
  */
-const IMAGE_PROXY: string | undefined = import.meta.env.VITE_IMAGE_PROXY
+const IMAGE_PROXY: string | undefined = API_URL ? `${API_URL}/img?u=` : undefined
 
 /** Compare l'illustration de la photo avec celle de chaque carte candidate. */
 async function compareImages(photo: HTMLCanvasElement, list: Candidate[]) {

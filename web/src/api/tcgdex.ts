@@ -1,6 +1,7 @@
 import { ApiError, cachedJson, DAY, HOUR } from './cache'
 import type { Cached, Card, CardBrief, Lang, SetBrief, SetDetail } from './types'
 import { sameLocalId } from '../scan/parse'
+import { API_URL } from '../lib/api'
 
 /**
  * Accès à TCGdex (https://tcgdex.dev) : base de données gratuite des cartes Pokémon,
@@ -8,7 +9,14 @@ import { sameLocalId } from '../scan/parse'
  * Toutes les fonctions passent par le cache (voir cache.ts).
  */
 
-const BASE = 'https://api.tcgdex.net/v2'
+const DIRECT = 'https://api.tcgdex.net/v2'
+// Avec notre serveur : on passe par lui (cache partagé, prix du jour enregistrés).
+// S'il ne répond pas, on se rabat directement sur TCGdex.
+const BASE = API_URL ? `${API_URL}/tcgdex/v2` : DIRECT
+
+function get<T>(path: string, ttlMs: number): Promise<Cached<T>> {
+  return cachedJson<T>(BASE + path, ttlMs, API_URL ? DIRECT + path : undefined)
+}
 
 /** URL d'une image de carte. quality : « low » (vignette) ou « high » (HD). */
 export function cardImage(image: string | undefined, quality: 'low' | 'high' = 'low'): string | undefined {
@@ -23,7 +31,7 @@ export function setIdOf(cardId: string): string {
 /** Extensions du jeu mobile « TCG Pocket » : cartes virtuelles, à exclure. */
 async function pocketSetIds(): Promise<Set<string>> {
   try {
-    const { data } = await cachedJson<{ sets: { id: string }[] }>(`${BASE}/fr/series/tcgp`, 7 * DAY)
+    const { data } = await get<{ sets: { id: string }[] }>(`/fr/series/tcgp`, 7 * DAY)
     return new Set(data.sets.map((s) => s.id))
   } catch {
     return new Set()
@@ -31,22 +39,22 @@ async function pocketSetIds(): Promise<Set<string>> {
 }
 
 export async function getSets(lang: Lang = 'fr'): Promise<SetBrief[]> {
-  const [{ data }, pocket] = await Promise.all([cachedJson<SetBrief[]>(`${BASE}/${lang}/sets`, DAY), pocketSetIds()])
+  const [{ data }, pocket] = await Promise.all([get<SetBrief[]>(`/${lang}/sets`, DAY), pocketSetIds()])
   return data.filter((s) => !pocket.has(s.id))
 }
 
 export async function getSet(id: string, lang: Lang = 'fr'): Promise<Cached<SetDetail>> {
-  return cachedJson<SetDetail>(`${BASE}/${lang}/sets/${encodeURIComponent(id)}`, DAY)
+  return get<SetDetail>(`/${lang}/sets/${encodeURIComponent(id)}`, DAY)
 }
 
 /** Fiche complète d'une carte : en français si elle existe, sinon en anglais. */
 export async function getCard(id: string): Promise<Cached<Card>> {
   try {
-    const res = await cachedJson<Omit<Card, 'lang'>>(`${BASE}/fr/cards/${encodeURIComponent(id)}`, 6 * HOUR)
+    const res = await get<Omit<Card, 'lang'>>(`/fr/cards/${encodeURIComponent(id)}`, 6 * HOUR)
     return { ...res, data: { ...res.data, lang: 'fr' } }
   } catch (err) {
     if (!(err instanceof ApiError) || err.kind !== 'notfound') throw err
-    const res = await cachedJson<Omit<Card, 'lang'>>(`${BASE}/en/cards/${encodeURIComponent(id)}`, 6 * HOUR)
+    const res = await get<Omit<Card, 'lang'>>(`/en/cards/${encodeURIComponent(id)}`, 6 * HOUR)
     return { ...res, data: { ...res.data, lang: 'en' } }
   }
 }
@@ -58,10 +66,10 @@ export async function getCard(id: string): Promise<Cached<Card>> {
 export async function searchByName(name: string): Promise<CardBrief[]> {
   const q = name.trim()
   if (q.length < 2) return []
-  const url = (lang: Lang) => `${BASE}/${lang}/cards?name=${encodeURIComponent(q)}&pagination:itemsPerPage=400`
+  const path = (lang: Lang) => `/${lang}/cards?name=${encodeURIComponent(q)}&pagination:itemsPerPage=400`
   const [fr, en, sets] = await Promise.all([
-    cachedJson<CardBrief[]>(url('fr'), DAY).then((r) => r.data).catch(rethrowUnlessNotFound),
-    cachedJson<CardBrief[]>(url('en'), DAY).then((r) => r.data).catch(rethrowUnlessNotFound),
+    get<CardBrief[]>(path('fr'), DAY).then((r) => r.data).catch(rethrowUnlessNotFound),
+    get<CardBrief[]>(path('en'), DAY).then((r) => r.data).catch(rethrowUnlessNotFound),
     getSets('fr').catch(() => [] as SetBrief[]),
   ])
   // Une même carte peut apparaître en FR et en EN : on garde la version française.
