@@ -17,7 +17,13 @@ export interface Db {
 export async function createDb(databaseUrl: string | undefined, dataDir?: string): Promise<Db> {
   if (databaseUrl) {
     const { default: pg } = await import('pg')
-    const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 })
+    const pool = new pg.Pool({
+      connectionString: databaseUrl,
+      max: 10,
+      // « channel_binding=require » (ex. adresses Neon) : la bibliothèque ne le lit pas
+      // dans l'adresse, on active donc l'option nous-mêmes (protection contre l'interception).
+      enableChannelBinding: /[?&]channel_binding=require\b/.test(databaseUrl),
+    })
     return {
       async query<T>(sql: string, params: unknown[] = []) {
         const res = await pool.query(sql, params)
