@@ -208,7 +208,7 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {top.map((r) => (
               <Link key={r.item.uid} to={`/carte/${encodeURIComponent(r.item.cardId)}`} className="w-24 shrink-0">
-                <CardImage image={r.item.image} alt={r.item.name} />
+                <CardImage image={r.item.image} cardId={r.item.cardId} alt={r.item.name} />
                 <p className="mt-1 truncate text-xs font-bold">{r.item.name}</p>
                 <p className="text-xs font-extrabold text-primary">{formatEur(r.unit)}</p>
               </Link>
@@ -297,7 +297,7 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
         <div className="grid grid-cols-3 gap-2">
           {filtered.map(({ item, unit }) => (
             <Link key={item.uid} to={`/carte/${encodeURIComponent(item.cardId)}`} className="relative block">
-              <CardImage image={item.image} alt={item.name} />
+              <CardImage image={item.image} cardId={item.cardId} alt={item.name} />
               {item.quantity > 1 && (
                 <span className="absolute top-1 right-1 rounded-full bg-ink px-2 text-xs font-bold text-bg">×{item.quantity}</span>
               )}
@@ -324,7 +324,7 @@ function ItemRow({ item, unit }: { item: CollectionItem; unit: number }) {
   return (
     <li className="flex gap-3 rounded-2xl border border-line bg-surface p-2">
       <Link to={`/carte/${encodeURIComponent(item.cardId)}`} className="w-14 shrink-0">
-        <CardImage image={item.image} alt={item.name} />
+        <CardImage image={item.image} cardId={item.cardId} alt={item.name} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link to={`/carte/${encodeURIComponent(item.cardId)}`} className="block truncate font-bold">
@@ -466,7 +466,7 @@ function Wishlist() {
         {wishlist.map((w) => (
           <div key={w.cardId} className="relative">
             <Link to={`/carte/${encodeURIComponent(w.cardId)}`}>
-              <CardImage image={w.image} alt={w.name} />
+              <CardImage image={w.image} cardId={w.cardId} alt={w.name} />
               <p className="mt-1 truncate text-xs font-bold">{w.name}</p>
               <p className="text-[11px] text-muted">{formatEur(prices[w.cardId]?.eur)}</p>
             </Link>

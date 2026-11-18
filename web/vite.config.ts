@@ -45,7 +45,7 @@ export default defineConfig({
           },
           {
             // Images des cartes : elles ne changent jamais.
-            urlPattern: ({ url }) => url.hostname === 'assets.tcgdex.net',
+            urlPattern: ({ url }) => url.hostname === 'assets.tcgdex.net' || url.hostname === 'images.pokemontcg.io',
             handler: 'CacheFirst',
             options: {
               cacheName: 'card-images',
