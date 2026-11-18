@@ -33,7 +33,28 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Les fichiers OCR sont lourds : on ne les télécharge qu'au premier scan.
+        globIgnores: ['ocr/**'],
         navigateFallback: 'index.html',
+        runtimeCaching: [
+          {
+            // Moteur OCR : gardé en cache après le premier scan (marche ensuite hors ligne).
+            urlPattern: ({ url }) => url.pathname.includes('/ocr/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'ocr', expiration: { maxEntries: 10 } },
+          },
+          {
+            // Images des cartes : elles ne changent jamais.
+            urlPattern: ({ url }) => url.hostname === 'assets.tcgdex.net',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'card-images',
+              expiration: { maxEntries: 800, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              // 0 = réponse « opaque » d'un autre site, normale pour une image affichée.
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

@@ -61,9 +61,18 @@ body {
 .pt-safe { padding-top: env(safe-area-inset-top); }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 
-:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
+/* Contour visible au clavier. Dans la couche « base » : une classe Tailwind peut le remplacer. */
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Ligne lumineuse qui balaie la photo pendant l'analyse. */
+@keyframes scan {
+  0%, 100% { top: 0; }
+  50% { top: calc(100% - 4px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

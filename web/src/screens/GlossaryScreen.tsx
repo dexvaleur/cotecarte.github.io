@@ -16,13 +16,13 @@ export function GlossaryScreen() {
   return (
     <>
       <ScreenTitle title="Glossaire" subtitle="Les mots du collectionneur, expliqués simplement." />
-      <label className="mb-4 flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3">
+      <label className="mb-4 flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3 focus-within:border-primary">
         <Search size={18} className="text-muted" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Chercher un mot (holo, ETB…)"
-          className="w-full bg-transparent outline-none placeholder:text-muted"
+          className="w-full bg-transparent outline-none placeholder:text-muted focus-visible:outline-none"
         />
       </label>
       <dl className="space-y-2">
