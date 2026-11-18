@@ -2,6 +2,7 @@ import { ImageOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ptcgImageUrl } from '../api/ptcgImage'
+import { useMyPhoto } from '../lib/myPhotos'
 import { cardImage, getSets, setIdOf } from '../api/tcgdex'
 import type { CardBrief } from '../api/types'
 
@@ -17,26 +18,40 @@ export function CardImage({
   alt,
   quality = 'low',
   className = '',
+  placeholderExtra,
+  onSource,
 }: {
   image?: string
   cardId?: string
   alt: string
   quality?: 'low' | 'high'
   className?: string
+  /** Contenu ajouté sous « Image indisponible » (ex. bouton « Ajouter ma photo ») */
+  placeholderExtra?: React.ReactNode
+  /** Indique quelle image est affichée : officielle, photo perso, ou aucune */
+  onSource?: (kind: 'official' | 'mine' | 'none') => void
 }) {
-  const sources = [cardImage(image, quality), cardId ? ptcgImageUrl(cardId, quality) : undefined].filter(
+  const myPhoto = useMyPhoto(cardId)
+  const sources = [
+    cardImage(image, quality),
+    cardId ? ptcgImageUrl(cardId, quality) : undefined,
+    myPhoto,
+  ].filter(
     (u): u is string => !!u,
   )
   const [attempt, setAttempt] = useState(0)
   // Nouvelle carte affichée dans le même composant : on repart de la 1re source.
   useEffect(() => setAttempt(0), [image, cardId])
   const src = sources[attempt]
+  const kind = !src ? 'none' : src === myPhoto ? 'mine' : 'official'
+  useEffect(() => onSource?.(kind), [kind, onSource])
   if (!src) {
     return (
       <div className={`grid aspect-[63/88] place-items-center rounded-[5%] bg-surface-2 text-muted ${className}`}>
         <div className="text-center text-xs">
           <ImageOff className="mx-auto mb-1" size={22} />
           Image indisponible
+          {placeholderExtra}
         </div>
       </div>
     )

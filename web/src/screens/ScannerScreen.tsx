@@ -1,6 +1,7 @@
 import { Camera, ImageUp, RotateCcw, Search, Sparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { rememberScanPhoto } from '../lib/myPhotos'
 import { ApiError } from '../api/cache'
 import { CameraCapture } from '../components/CameraCapture'
 import { CardThumb, useSetNames } from '../components/CardThumb'
@@ -41,6 +42,7 @@ export function ScannerScreen() {
         const step = p.status.includes('load') ? 'Chargement du lecteur de texte…' : 'Lecture du nom et du numéro…'
         setPhaseState((cur) => (cur.name === 'analyzing' && cur.step !== step ? { ...cur, step } : cur))
       })
+      rememberScanPhoto(rec.preview)
       if (rec.confident) {
         setPhase({ name: 'results', preview: rec.preview, rec })
         navigate(`/carte/${encodeURIComponent(rec.candidates[0].id)}`)

@@ -1,10 +1,11 @@
-import { ArrowLeft, Check, Heart, Plus, RefreshCw, Tag, TrendingDown, TrendingUp } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { ArrowLeft, Camera, Check, Heart, Plus, RefreshCw, Tag, TrendingDown, TrendingUp } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ApiError } from '../api/cache'
 import { getCard, getSet, setIdOf } from '../api/tcgdex'
 import type { Card, SetDetail } from '../api/types'
 import { CardImage } from '../components/CardThumb'
+import { hasMyPhoto, recentScanPhoto, removeMyPhoto, saveMyPhotoFromDataUrl, saveMyPhotoFromFile } from '../lib/myPhotos'
 import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from '../components/ConditionCheck'
 import { PriceChart } from '../components/PriceChart'
 import { Card as Box } from '../components/ui'
@@ -74,6 +75,8 @@ export function CardScreen() {
 function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetail | null; stale: boolean; fetchedAt: number }) {
   const [answers, setAnswers] = useState<Answers>({})
   const [toast, setToast] = useState<string | null>(null)
+  const [imageKind, setImageKind] = useState<'official' | 'mine' | 'none'>('official')
+  const photoRef = useRef<HTMLInputElement>(null)
   const { collection, wishlist } = useCollectionState()
   const owned = collection.filter((c) => c.cardId === card.id).reduce((n, c) => n + c.quantity, 0)
   const wished = wishlist.some((w) => w.cardId === card.id)
@@ -104,6 +107,21 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       priceEur: ref,
     })
     setToast(`Ajoutée à ta collection (${CONDITIONS[grade ?? 'NM'].short})`)
+    // Carte sans image officielle, tout juste scannée : on garde la photo du scan.
+    const scan = recentScanPhoto()
+    if (scan && imageKind === 'none' && !hasMyPhoto(card.id)) saveMyPhotoFromDataUrl(card.id, scan).catch(() => {})
+  }
+
+  async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      await saveMyPhotoFromFile(card.id, file)
+      setToast('Photo enregistrée sur ton téléphone')
+    } catch {
+      setToast('Impossible de lire cette photo')
+    }
   }
 
   return (
@@ -117,7 +135,36 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       {/* En-tête : image + infos principales */}
       <div className="flex gap-4">
         <div className="w-[42%] shrink-0">
-          <CardImage image={card.image} cardId={card.id} alt={card.name} quality="high" className="shadow-xl" />
+          <CardImage
+            image={card.image}
+            cardId={card.id}
+            alt={card.name}
+            quality="high"
+            className="shadow-xl"
+            onSource={setImageKind}
+            placeholderExtra={
+              <button
+                type="button"
+                onClick={() => photoRef.current?.click()}
+                className="mx-auto mt-3 flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 font-bold text-primary-ink"
+              >
+                <Camera size={14} /> Ajouter ma photo
+              </button>
+            }
+          />
+          <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden onChange={onPhoto} />
+          {imageKind === 'mine' && (
+            <p className="mt-1.5 text-center text-xs text-muted">
+              Ta photo ·{' '}
+              <button type="button" className="font-semibold text-primary" onClick={() => photoRef.current?.click()}>
+                Changer
+              </button>{' '}
+              ·{' '}
+              <button type="button" className="font-semibold text-primary" onClick={() => removeMyPhoto(card.id)}>
+                Retirer
+              </button>
+            </p>
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl leading-tight font-extrabold tracking-tight">{card.name}</h1>
