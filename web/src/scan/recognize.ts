@@ -149,9 +149,12 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
 
   // Ce qu'on a compris : nom de Pokémon corrigé, suffixe (ex, V…), « Méga », numéros isolés.
   const species = speciesIn(names)
-  const suffix = parseSuffix(topText) ?? species[0]?.suffix ?? (allText ? parseSuffix(allText) : null)
+  // Suffixe (ex, V…) : seulement à côté du nom. Ailleurs sur la carte, des mots comme
+  // « Règle V » ou « Pokémon-ex » donneraient de fausses pistes.
+  const suffix = parseSuffix(topText) ?? species.find((m) => m.suffix)?.suffix ?? null
   const mega = hasMegaPrefix(topText)
-  const loose = looseNumbers(bottomText + '\n' + footer)
+  // Nombres isolés : seulement dans la zone du numéro (la ligne du copyright est pleine de chiffres).
+  const loose = looseNumbers(bottomText)
 
   // --- 2. Recherche -------------------------------------------------------
   const pool = new Map<string, CardBrief>()
@@ -196,7 +199,9 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
       (fromNumberSearch || readNumber.total === null)
     const looseMatch = !numberMatch && loose.some((n) => sameLocalId(c.localId, n))
     const cardSuffix = parseSuffix(' ' + c.name.replace(/-/g, ' '))
-    const suffixBonus = suffix && cardSuffix === suffix ? 0.4 : suffix && !cardSuffix ? -0.2 : 0
+    // Suffixe lu = même suffixe sur la carte : bonus. Pas de suffixe lu : léger désavantage aux
+    // cartes qui en ont un (le logo peut avoir été mal lu, donc seulement un peu).
+    const suffixBonus = suffix ? (cardSuffix === suffix ? 0.4 : !cardSuffix ? -0.2 : 0) : cardSuffix ? -0.15 : 0
     const cardMega = /^m[ée]ga[- ]/i.test(c.name)
     const megaBonus = mega && cardMega ? 0.5 : mega && !cardMega ? -0.3 : 0
     const recent = (recency.get(setIdOf(c.id)) ?? 0) * 0.3
@@ -205,12 +210,14 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     const agree = 0.3 + 0.7 * nameScore
     const score =
       nameScore * 2.5 +
-      (numberMatch ? 1.5 : looseMatch ? 0.8 : 0) * agree +
+      (numberMatch ? 1.5 : looseMatch ? 0.4 : 0) * agree +
       (fromNumberSearch ? 1 : 0) * agree +
       suffixBonus +
       megaBonus +
       recent
-    return { ...c, score, nameScore, numberMatch: numberMatch || looseMatch, imageScore: null }
+    // numberMatch reste « strict » (numéro + total) : un nombre isolé n'est qu'un indice,
+    // jamais suffisant pour ouvrir directement une fiche.
+    return { ...c, score, nameScore, numberMatch, imageScore: null }
   })
   candidates.sort((a, b) => b.score - a.score)
 

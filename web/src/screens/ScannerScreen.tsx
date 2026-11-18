@@ -7,7 +7,7 @@ import { CardThumb, useSetNames } from '../components/CardThumb'
 import { Card, ScreenTitle } from '../components/ui'
 import { useOnline } from '../lib/useOnline'
 import { canvasToDataUrl, cropToCard, fileToCanvas, findCard } from '../scan/image'
-import { warmUpOcr } from '../scan/ocr'
+import { OcrLoadError, warmUpOcr } from '../scan/ocr'
 import { type Recognition, recognizeCard } from '../scan/recognize'
 
 type Phase =
@@ -15,10 +15,13 @@ type Phase =
   | { name: 'camera' }
   | { name: 'analyzing'; preview: string; step: string }
   | { name: 'results'; preview: string; rec: Recognition }
-  | { name: 'error'; preview?: string; message: string }
+  | { name: 'error'; preview?: string; message: string; detail?: string }
 
 // On garde le dernier résultat en mémoire : en revenant de la fiche, la liste est toujours là.
 let lastPhase: Phase = { name: 'idle' }
+
+/** Erreur de chargement d'un morceau de l'appli (souvent juste après une mise à jour). */
+const isChunkError = (e: unknown) => /dynamically imported module|Importing a module script failed|Failed to fetch|Load failed/i.test(String((e as Error)?.message ?? e))
 
 export function ScannerScreen() {
   const [phase, setPhaseState] = useState<Phase>(lastPhase)
@@ -53,7 +56,10 @@ export function ScannerScreen() {
             ? e.kind === 'offline'
               ? 'Pas de connexion : impossible de chercher la carte. Réessaie quand tu auras du réseau.'
               : 'Le service de cartes ne répond pas. Réessaie dans quelques minutes.'
-            : 'La lecture de la photo a échoué. Réessaie avec une photo plus nette.',
+            : e instanceof OcrLoadError || isChunkError(e)
+              ? 'Le lecteur de texte n’a pas pu se charger (connexion faible ou appli tout juste mise à jour). Ferme et rouvre l’appli, puis réessaie.'
+              : 'La lecture de la photo a échoué. Réessaie avec une photo plus nette.',
+        detail: e instanceof ApiError ? undefined : String((e as Error)?.message ?? e).slice(0, 200),
       })
     }
   }
@@ -85,7 +91,9 @@ export function ScannerScreen() {
             pickFile()
           }}
           // Si la carte ne remplit pas tout le cadre, on affine le recadrage.
-          onCapture={(c) => void analyze(findCard(c, 0.6, true) ?? [c])}
+          // Carte cherchée dans la capture élargie ; elle doit occuper l'essentiel du cadre
+          // (sinon on a sans doute trouvé l'illustration) : à défaut, on prend le cadre tel quel.
+          onCapture={(framed, wide) => void analyze(findCard(wide, 0.6, true, 0.25) ?? [framed])}
         />
       )}
 
@@ -128,6 +136,7 @@ export function ScannerScreen() {
           {phase.preview && <img src={phase.preview} alt="" className="mx-auto mb-3 w-28 rounded-xl" />}
           <p className="font-bold">Oups !</p>
           <p className="text-muted">{phase.message}</p>
+          {phase.detail && <p className="mt-2 text-xs break-words text-muted/70">Détail technique : {phase.detail}</p>}
           <div className="mt-4 grid gap-2">
             <button onClick={() => setPhase({ name: 'camera' })} className="rounded-2xl bg-primary py-3 font-bold text-primary-ink">
               Reprendre une photo

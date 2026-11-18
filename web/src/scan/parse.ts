@@ -196,7 +196,12 @@ export function nameSimilarity(read: string, cardName: string): number {
 }
 
 /** Suffixes lus de travers : le logo « ex » est souvent lu « es », « ez », « cx »… */
-const SUFFIX_TAILS: Record<string, string> = { ex: 'ex', es: 'ex', ez: 'ex', cx: 'ex', ax: 'ex', gx: 'gx', v: 'v', vmax: 'vmax', vstar: 'vstar', star: 'vstar' }
+// Le logo « ex » collé au nom est souvent lu « es », « e », « cx »… et le logo « V » « y », « w » ou « vy ».
+const SUFFIX_TAILS: Record<string, string> = {
+  ex: 'ex', es: 'ex', ez: 'ex', cx: 'ex', ax: 'ex', e: 'ex', x: 'ex', gx: 'gx',
+  v: 'v', y: 'v', w: 'v', vy: 'v', vv: 'v',
+  vmax: 'vmax', vstar: 'vstar', star: 'vstar', vstr: 'vstar',
+}
 
 export interface SpeciesMatch {
   name: string
