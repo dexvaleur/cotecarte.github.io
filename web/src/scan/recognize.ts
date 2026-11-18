@@ -222,7 +222,11 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   candidates.sort((a, b) => b.score - a.score)
 
   // On garde les meilleurs, puis on compare époque et images pour les départager.
-  const best = candidates.filter((c) => c.score >= 1).slice(0, 10)
+  // Nom sûr mais numéro illisible : on garde toutes les versions de la carte (jusqu'à 30),
+  // l'utilisateur choisira (ou tapera le numéro pour filtrer).
+  const strict = candidates.some((c) => c.numberMatch)
+  const limit = species.length && !strict ? 30 : 10
+  const best = candidates.filter((c) => c.score >= 1).slice(0, limit)
   if (year) await compareYears(year, best)
   await compareImages(card, best)
   best.sort((a, b) => b.score - a.score)

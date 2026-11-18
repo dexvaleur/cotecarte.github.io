@@ -201,6 +201,15 @@ function Results({ preview, rec, onRetry, onReset }: { preview: string; rec: Rec
   const clearLead = !!a && (!b || a.score - b.score >= 0.4)
   const searchHref = `/recherche${rec.readName ? `?q=${encodeURIComponent(rec.readName.split(' ')[0])}` : ''}`
 
+  // Filtre par numéro tapé : « 093/088 » → on garde le n° 93 ; « TG07 » → TG7.
+  const [num, setNum] = useState('')
+  const typed = num.split('/')[0].replace(/\s/g, '').toUpperCase()
+  // Que des zéros (début de « 093 ») : on attend la suite avant de filtrer.
+  const filterKey = /^[A-Z]*0*$/.test(typed) && !/[A-Z]/.test(typed) ? '' : typed.replace(/^([A-Z]*)0+(?=\d)/, '$1')
+  const shown = filterKey
+    ? rec.candidates.filter((c) => c.localId.toUpperCase().replace(/^([A-Z]*)0+(?=\d)/, '$1').startsWith(filterKey))
+    : rec.candidates
+
   return (
     <>
       <div className="mb-4 flex items-center gap-3">
@@ -216,14 +225,40 @@ function Results({ preview, rec, onRetry, onReset }: { preview: string; rec: Rec
 
       {rec.candidates.length > 0 ? (
         <>
-          <p className="mb-2 text-sm text-muted">Touche la carte qui correspond à la tienne.</p>
+          {rec.candidates.length > 4 && (
+            <label className="mb-3 block rounded-2xl border border-line bg-surface p-3 focus-within:border-primary">
+              <span className="text-sm font-semibold">Il y a plusieurs versions : tape le numéro écrit en bas de ta carte</span>
+              <input
+                value={num}
+                onChange={(e) => setNum(e.target.value)}
+                placeholder="ex. 093 ou 093/088 ou TG07"
+                aria-label="Numéro en bas de la carte"
+                inputMode="text"
+                autoCapitalize="characters"
+                className="mt-2 w-full rounded-xl border border-line bg-bg px-3 py-2 font-semibold outline-none placeholder:font-normal placeholder:text-muted focus-visible:border-primary focus-visible:outline-none"
+              />
+            </label>
+          )}
+          <p className="mb-2 text-sm text-muted">
+            {shown.length
+              ? `Touche la carte qui correspond à la tienne${shown.length > 4 ? ` (${shown.length} versions)` : ''}.`
+              : 'Aucune de ces versions n’a ce numéro.'}
+          </p>
+          {!shown.length && (
+            <Link
+              to={`/recherche?q=${encodeURIComponent(rec.readName?.split(' ')[0] ?? '')}&n=${encodeURIComponent(num.trim())}`}
+              className="mb-3 block rounded-2xl bg-primary py-3 text-center font-bold text-primary-ink"
+            >
+              Chercher la carte n° {num.trim()}
+            </Link>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {rec.candidates.map((c, i) => (
+            {shown.map((c, i) => (
               <CardThumb
                 key={c.id}
                 card={c}
                 setName={setNames.get(c.id.slice(0, c.id.lastIndexOf('-')))}
-                extra={i === 0 && clearLead ? <span className="mt-1 inline-block rounded-full bg-good/15 px-2 py-0.5 text-[11px] font-bold text-good">Le plus probable</span> : null}
+                extra={i === 0 && clearLead && !filterKey ? <span className="mt-1 inline-block rounded-full bg-good/15 px-2 py-0.5 text-[11px] font-bold text-good">Le plus probable</span> : null}
               />
             ))}
           </div>
