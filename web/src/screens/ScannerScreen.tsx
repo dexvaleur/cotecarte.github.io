@@ -39,10 +39,10 @@ export function ScannerScreen() {
         setPhaseState((cur) => (cur.name === 'analyzing' && cur.step !== step ? { ...cur, step } : cur))
       })
       if (rec.confident) {
-        setPhase({ name: 'results', preview, rec })
+        setPhase({ name: 'results', preview: rec.preview, rec })
         navigate(`/carte/${encodeURIComponent(rec.candidates[0].id)}`)
       } else {
-        setPhase({ name: 'results', preview, rec })
+        setPhase({ name: 'results', preview: rec.preview, rec })
       }
     } catch (e) {
       setPhase({
@@ -85,7 +85,7 @@ export function ScannerScreen() {
             pickFile()
           }}
           // Si la carte ne remplit pas tout le cadre, on affine le recadrage.
-          onCapture={(c) => void analyze(findCard(c, 0.6) ?? [c])}
+          onCapture={(c) => void analyze(findCard(c, 0.6, true) ?? [c])}
         />
       )}
 

@@ -39,10 +39,10 @@ export function cropToCard(src: HTMLCanvasElement): HTMLCanvasElement {
 
 /**
  * Trouve la carte dans une photo et la redresse (voir locate.ts).
- * Renvoie deux versions : la carte dans le sens trouvé, et retournée à 180°
- * (on ne sait pas encore où est le haut ; l'OCR choisira). null si rien trouvé.
+ * Renvoie deux versions : la carte dans le sens de la photo, et retournée à 180°
+ * (l'OCR choisira), ou une seule avec `uprightOnly`. null si rien trouvé.
  */
-export function findCard(src: HTMLCanvasElement, minQuality = 0.5): HTMLCanvasElement[] | null {
+export function findCard(src: HTMLCanvasElement, minQuality = 0.5, uprightOnly = false): HTMLCanvasElement[] | null {
   const scale = Math.min(1, 360 / Math.max(src.width, src.height))
   const W = Math.round(src.width * scale)
   const H = Math.round(src.height * scale)
@@ -75,7 +75,11 @@ export function findCard(src: HTMLCanvasElement, minQuality = 0.5): HTMLCanvasEl
     o.drawImage(src, 0, 0)
     return out
   }
-  return [draw(1), draw(-1)]
+  // La version « droite dans la photo » (haut de la carte vers le haut de l'image) d'abord.
+  // Pour une carte couchée (photo prise de côté), on ne peut pas savoir : on garde l'ordre.
+  const upright: 1 | -1 = box.uy < -0.5 ? -1 : 1
+  // Caméra : la carte est tenue droite dans le cadre, on ne teste pas l'autre sens.
+  return uprightOnly ? [draw(upright)] : [draw(upright), draw(upright === 1 ? -1 : 1)]
 }
 
 /**
