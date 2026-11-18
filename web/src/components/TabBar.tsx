@@ -1,0 +1,48 @@
+import { Gift, Layers, Newspaper, ScanLine, Tag } from 'lucide-react'
+import { NavLink } from 'react-router'
+
+const TABS = [
+  { to: '/scanner', label: 'Scanner', Icon: ScanLine },
+  { to: '/collection', label: 'Collection', Icon: Layers },
+  { to: '/packs', label: 'Packs', Icon: Gift },
+  { to: '/actus', label: 'Actus', Icon: Newspaper },
+  { to: '/vendre', label: 'Vendre', Icon: Tag },
+]
+
+/** Barre d'onglets en bas de l'écran, facile à atteindre avec le pouce. */
+export function TabBar() {
+  return (
+    <nav
+      aria-label="Navigation principale"
+      className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur"
+    >
+      <ul className="mx-auto flex max-w-xl">
+        {TABS.map(({ to, label, Icon }) => (
+          <li key={to} className="flex-1">
+            <NavLink
+              to={to}
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition-colors ${
+                  isActive ? 'text-primary' : 'text-muted'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`grid h-8 w-14 place-items-center rounded-full transition-colors ${
+                      isActive ? 'bg-primary-soft' : ''
+                    }`}
+                  >
+                    <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                  </span>
+                  {label}
+                </>
+              )}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
