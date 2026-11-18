@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { getSets } from '../api/tcgdex'
 import type { SetBrief } from '../api/types'
 import { AccountPanel } from '../components/AccountPanel'
+import { decrement } from '../components/OwnedCopies'
 import { CardImage } from '../components/CardThumb'
 import { PriceChart } from '../components/PriceChart'
 import { Card, ScreenTitle } from '../components/ui'
@@ -291,6 +292,7 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
 
       <p className="mt-3 mb-2 text-sm text-muted">
         {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
+        {view === 'grid' && filtered.length > 0 && ' · touche une carte pour la retirer ou changer la quantité'}
       </p>
 
       {view === 'grid' ? (
@@ -347,7 +349,7 @@ function ItemRow({ item, unit }: { item: CollectionItem; unit: number }) {
             ))}
           </select>
           <div className="flex items-center rounded-lg border border-line">
-            <button onClick={() => updateItem(item.uid, { quantity: item.quantity - 1 })} aria-label="Un de moins" className="px-1.5 py-1">
+            <button onClick={() => decrement(item)} aria-label="Un de moins" className="px-1.5 py-1">
               <Minus size={14} />
             </button>
             <span className="min-w-5 text-center text-xs font-bold">{item.quantity}</span>

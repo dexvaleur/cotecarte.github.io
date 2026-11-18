@@ -127,6 +127,23 @@ export function removeItem(uid: string) {
   enqueue({ type: 'deleteItem', uid })
 }
 
+/**
+ * Garder un seul exemplaire d'une carte : on garde celui en meilleur état
+ * (factor le plus haut) avec quantité 1, et on retire les autres.
+ */
+export function keepOnlyOne(cardId: string, factorOf: (c: CollectionItem) => number) {
+  const copies = state.collection.filter((c) => c.cardId === cardId)
+  if (!copies.length) return
+  const best = copies.reduce((a, b) => (factorOf(b) > factorOf(a) ? b : a))
+  for (const c of copies) if (c.uid !== best.uid) removeItem(c.uid)
+  if (best.quantity !== 1) updateItem(best.uid, { quantity: 1 })
+}
+
+/** Retirer tous les exemplaires d'une carte. */
+export function removeCard(cardId: string) {
+  for (const c of state.collection.filter((i) => i.cardId === cardId)) removeItem(c.uid)
+}
+
 export function toggleWish(item: Omit<WishItem, 'addedAt'>) {
   if (state.wishlist.some((w) => w.cardId === item.cardId)) return removeWish(item.cardId)
   const wish = { ...item, addedAt: new Date().toISOString() }

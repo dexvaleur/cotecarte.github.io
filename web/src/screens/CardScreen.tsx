@@ -5,6 +5,7 @@ import { ApiError } from '../api/cache'
 import { getCard, getSet, setIdOf } from '../api/tcgdex'
 import type { Card, SetDetail } from '../api/types'
 import { CardImage } from '../components/CardThumb'
+import { OwnedCopies } from '../components/OwnedCopies'
 import { hasMyPhoto, recentScanPhoto, removeMyPhoto, saveMyPhotoFromDataUrl, saveMyPhotoFromFile } from '../lib/myPhotos'
 import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from '../components/ConditionCheck'
 import { PriceChart } from '../components/PriceChart'
@@ -189,6 +190,8 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
           )}
         </div>
       </div>
+
+      <OwnedCopies items={collection.filter((c) => c.cardId === card.id)} />
 
       {/* Rareté */}
       <Box>
