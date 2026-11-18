@@ -58,7 +58,7 @@ export function SetScreen() {
                 return (
                   <Link key={c.id} to={`/carte/${encodeURIComponent(c.id)}`} className="relative block">
                     <div className={have ? '' : 'opacity-35 grayscale'}>
-                      <CardImage image={c.image} alt={c.name} />
+                      <CardImage image={c.image} cardId={c.id} alt={c.name} />
                     </div>
                     {have && (
                       <span className="absolute top-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-good text-white" aria-label="Possédée">

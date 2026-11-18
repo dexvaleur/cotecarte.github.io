@@ -1,24 +1,37 @@
 import { ImageOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { ptcgImageUrl } from '../api/ptcgImage'
 import { cardImage, getSets, setIdOf } from '../api/tcgdex'
 import type { CardBrief } from '../api/types'
 
-/** Image de carte avec repli si l'image est absente ou ne charge pas. */
+/**
+ * Image de carte, avec deux replis :
+ * 1. image TCGdex ;
+ * 2. si TCGdex n'en a pas (ou si elle ne charge pas) : image pokemontcg.io (il faut `cardId`) ;
+ * 3. sinon : « Image indisponible ».
+ */
 export function CardImage({
   image,
+  cardId,
   alt,
   quality = 'low',
   className = '',
 }: {
   image?: string
+  cardId?: string
   alt: string
   quality?: 'low' | 'high'
   className?: string
 }) {
-  const [failed, setFailed] = useState(false)
-  const src = cardImage(image, quality)
-  if (!src || failed) {
+  const sources = [cardImage(image, quality), cardId ? ptcgImageUrl(cardId, quality) : undefined].filter(
+    (u): u is string => !!u,
+  )
+  const [attempt, setAttempt] = useState(0)
+  // Nouvelle carte affichée dans le même composant : on repart de la 1re source.
+  useEffect(() => setAttempt(0), [image, cardId])
+  const src = sources[attempt]
+  if (!src) {
     return (
       <div className={`grid aspect-[63/88] place-items-center rounded-[5%] bg-surface-2 text-muted ${className}`}>
         <div className="text-center text-xs">
@@ -30,10 +43,11 @@ export function CardImage({
   }
   return (
     <img
+      key={src}
       src={src}
       alt={alt}
       loading="lazy"
-      onError={() => setFailed(true)}
+      onError={() => setAttempt((a) => a + 1)}
       className={`aspect-[63/88] w-full rounded-[5%] bg-surface-2 object-cover ${className}`}
     />
   )
@@ -59,7 +73,7 @@ export function useSetNames(): Map<string, string> {
 export function CardThumb({ card, setName, extra }: { card: CardBrief; setName?: string; extra?: React.ReactNode }) {
   return (
     <Link to={`/carte/${encodeURIComponent(card.id)}`} className="block rounded-2xl p-1 active:scale-[.98]">
-      <CardImage image={card.image} alt={card.name} />
+      <CardImage image={card.image} cardId={card.id} alt={card.name} />
       <p className="mt-1.5 truncate text-sm font-bold">{card.name}</p>
       <p className="truncate text-xs text-muted">
         {setName ?? setIdOf(card.id)} · n° {card.localId}

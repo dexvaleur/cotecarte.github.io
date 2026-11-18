@@ -117,7 +117,7 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       {/* En-tête : image + infos principales */}
       <div className="flex gap-4">
         <div className="w-[42%] shrink-0">
-          <CardImage image={card.image} alt={card.name} quality="high" className="shadow-xl" />
+          <CardImage image={card.image} cardId={card.id} alt={card.name} quality="high" className="shadow-xl" />
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl leading-tight font-extrabold tracking-tight">{card.name}</h1>
