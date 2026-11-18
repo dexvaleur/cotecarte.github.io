@@ -8,6 +8,13 @@ import type { Worker } from 'tesseract.js'
 
 let workerPromise: Promise<Worker> | null = null
 
+/** Le moteur de lecture n'a pas pu être chargé (réseau, fichiers manquants…). */
+export class OcrLoadError extends Error {
+  constructor(cause: unknown) {
+    super(`Chargement du lecteur de texte impossible : ${String((cause as Error)?.message ?? cause)}`)
+  }
+}
+
 export type OcrProgress = (p: { status: string; progress: number }) => void
 let progressListener: OcrProgress | null = null
 
@@ -49,10 +56,20 @@ export async function readTextWithConfidence(
   allowed = '',
 ): Promise<{ text: string; confidence: number }> {
   progressListener = onProgress ?? null
-  const worker = await getWorker()
-  await worker.setParameters({ tessedit_char_whitelist: allowed })
-  const { data } = await worker.recognize(img)
-  return { text: data.text, confidence: data.confidence }
+  let worker: Worker
+  try {
+    worker = await getWorker()
+  } catch (err) {
+    throw new OcrLoadError(err)
+  }
+  try {
+    await worker.setParameters({ tessedit_char_whitelist: allowed })
+    const { data } = await worker.recognize(img)
+    return { text: data.text, confidence: data.confidence }
+  } catch {
+    // Une zone illisible (image trop petite…) ne doit pas faire échouer tout le scan.
+    return { text: '', confidence: 0 }
+  }
 }
 
 /** Précharge le moteur OCR (appelé quand on ouvre la caméra, pour gagner du temps). */

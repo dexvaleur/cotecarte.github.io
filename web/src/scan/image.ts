@@ -42,7 +42,13 @@ export function cropToCard(src: HTMLCanvasElement): HTMLCanvasElement {
  * Renvoie deux versions : la carte dans le sens de la photo, et retournée à 180°
  * (l'OCR choisira), ou une seule avec `uprightOnly`. null si rien trouvé.
  */
-export function findCard(src: HTMLCanvasElement, minQuality = 0.5, uprightOnly = false): HTMLCanvasElement[] | null {
+export function findCard(
+  src: HTMLCanvasElement,
+  minQuality = 0.5,
+  uprightOnly = false,
+  /** Part minimale de l'image occupée par la carte (évite de prendre l'illustration pour la carte) */
+  minArea = 0,
+): HTMLCanvasElement[] | null {
   const scale = Math.min(1, 360 / Math.max(src.width, src.height))
   const W = Math.round(src.width * scale)
   const H = Math.round(src.height * scale)
@@ -51,6 +57,7 @@ export function findCard(src: HTMLCanvasElement, minQuality = 0.5, uprightOnly =
   ctx.drawImage(src, 0, 0, W, H)
   const box = locateCard(ctx.getImageData(0, 0, W, H).data, W, H)
   if (!box || box.quality < minQuality) return null
+  if ((box.w * box.h) / (W * H) < minArea) return null
 
   // Dimensions dans l'image d'origine.
   const cx = box.cx / scale

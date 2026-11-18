@@ -129,3 +129,13 @@ test('préfixe Méga et noms avec suffixes', () => {
   assert.ok(nameSimilarity('Florizarre', 'Méga-Florizarre-ex') === 1)
   assert.ok(nameSimilarity('Mimiqui', 'Mimiqui-ex') === 1)
 })
+
+test('vraie photo : logo « V » lu « y » (« Shayminy »)', () => {
+  const m = matchSpecies('Shayminy', ['Shaymin', 'Sapereau'])
+  assert.equal(m?.name, 'Shaymin')
+  assert.equal(m?.suffix, 'v')
+})
+
+test('vraie photo : logo « ex » lu « e » (« Mimiquie »)', () => {
+  assert.equal(matchSpecies('Mimiquie', ['Mimiqui', 'Mimigal'])?.suffix, 'ex')
+})

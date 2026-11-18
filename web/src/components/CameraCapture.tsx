@@ -11,7 +11,8 @@ export function CameraCapture({
   onClose,
   onPickFile,
 }: {
-  onCapture: (card: HTMLCanvasElement) => void
+  /** framed : exactement le cadre ; wide : le cadre avec une marge autour */
+  onCapture: (framed: HTMLCanvasElement, wide: HTMLCanvasElement) => void
   onClose: () => void
   onPickFile: () => void
 }) {
@@ -73,10 +74,24 @@ export function CameraCapture({
     const sw = frame.width / scale
     const sh = frame.height / scale
 
-    const out = makeCanvas(Math.min(sw, 1000), Math.min(sw, 1000) / CARD_RATIO)
-    out.getContext('2d')!.drawImage(v, sx, sy, sw, sh, 0, 0, out.width, out.height)
+    // 1) Exactement le cadre (utilisé si on ne trouve pas mieux).
+    const framed = makeCanvas(Math.min(sw, 1000), Math.min(sw, 1000) / CARD_RATIO)
+    framed.getContext('2d')!.drawImage(v, sx, sy, sw, sh, 0, 0, framed.width, framed.height)
+
+    // 2) Le cadre + une marge de 15 % : si la carte remplit le cadre, ses bords restent
+    //    visibles et on peut la repérer précisément (sinon on la couperait).
+    const mx = sw * 0.15
+    const my = sh * 0.15
+    const wx = Math.max(0, sx - mx)
+    const wy = Math.max(0, sy - my)
+    const ww = Math.min(v.videoWidth, sx + sw + mx) - wx
+    const wh = Math.min(v.videoHeight, sy + sh + my) - wy
+    const k = Math.min(1, 1400 / Math.max(ww, wh))
+    const wide = makeCanvas(ww * k, wh * k)
+    wide.getContext('2d')!.drawImage(v, wx, wy, ww, wh, 0, 0, wide.width, wide.height)
+
     navigator.vibrate?.(30)
-    onCapture(out)
+    onCapture(framed, wide)
   }
 
   return (
