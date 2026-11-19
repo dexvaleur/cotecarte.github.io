@@ -1,18 +1,32 @@
 import { ImageUp, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { CARD_RATIO, makeCanvas } from '../scan/image'
+import { CARD_RATIO, makeCanvas, sharpness } from '../scan/image'
 
 /**
  * Caméra plein écran avec un cadre au format carte.
  * Au déclenchement, on ne garde que la partie de l'image dans le cadre.
  */
+export interface Shot {
+  framed: HTMLCanvasElement
+  wide: HTMLCanvasElement
+  sharpness: number
+}
+
+const BURST = 6 // images prises après l'appui
+const BURST_GAP_MS = 90
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 export function CameraCapture({
   onCapture,
   onClose,
   onPickFile,
 }: {
-  /** framed : exactement le cadre ; wide : le cadre avec une marge autour */
-  onCapture: (framed: HTMLCanvasElement, wide: HTMLCanvasElement) => void
+  /**
+   * Images prises en rafale, de la plus nette à la moins nette.
+   * framed : exactement le cadre ; wide : le cadre avec une marge autour.
+   */
+  onCapture: (shots: Shot[]) => void
   onClose: () => void
   onPickFile: () => void
 }) {
@@ -21,6 +35,7 @@ export function CameraCapture({
   const frameRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let stream: MediaStream | null = null
@@ -33,10 +48,17 @@ export function CameraCapture({
       }
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          // Bonne définition : le petit numéro en bas de la carte se lit mieux.
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1440 } },
           audio: false,
         })
         if (cancelled) return stream.getTracks().forEach((t) => t.stop())
+        // Mise au point continue quand le téléphone le permet (ignoré sinon).
+        const track = stream.getVideoTracks()[0]
+        const caps = (track.getCapabilities?.() ?? {}) as { focusMode?: string[] }
+        if (caps.focusMode?.includes('continuous')) {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => {})
+        }
         const v = videoRef.current!
         v.srcObject = stream
         await v.play()
@@ -59,11 +81,12 @@ export function CameraCapture({
     }
   }, [])
 
-  function capture() {
+  /** Une image de la vidéo : le cadre seul, et le cadre avec une marge. */
+  function grab(): Shot | null {
     const v = videoRef.current
     const box = boxRef.current?.getBoundingClientRect()
     const frame = frameRef.current?.getBoundingClientRect()
-    if (!v || !box || !frame || !v.videoWidth) return
+    if (!v || !box || !frame || !v.videoWidth) return null
 
     // La vidéo est affichée en « cover » : on retrouve la zone du cadre dans l'image réelle.
     const scale = Math.max(box.width / v.videoWidth, box.height / v.videoHeight)
@@ -90,8 +113,27 @@ export function CameraCapture({
     const wide = makeCanvas(ww * k, wh * k)
     wide.getContext('2d')!.drawImage(v, wx, wy, ww, wh, 0, 0, wide.width, wide.height)
 
+    return { framed, wide, sharpness: sharpness(framed) }
+  }
+
+  /**
+   * Rafale : l'appui sur le bouton fait souvent bouger le téléphone, et la mise au point
+   * peut hésiter. On prend plusieurs images et on garde les plus nettes.
+   */
+  async function capture() {
+    if (busy) return
+    setBusy(true)
     navigator.vibrate?.(30)
-    onCapture(framed, wide)
+    const shots: Shot[] = []
+    for (let i = 0; i < BURST; i++) {
+      await wait(BURST_GAP_MS)
+      const s = grab()
+      if (s) shots.push(s)
+    }
+    setBusy(false)
+    if (!shots.length) return
+    shots.sort((a, b) => b.sharpness - a.sharpness)
+    onCapture(shots.slice(0, 2))
   }
 
   return (
@@ -117,7 +159,7 @@ export function CameraCapture({
           <X />
         </button>
         <p className="rounded-full bg-black/50 px-3 py-1.5 text-sm font-semibold">
-          {ready ? 'Cadre toute la carte, sans reflet' : 'Ouverture de la caméra…'}
+          {busy ? 'Ne bouge pas…' : ready ? 'Cadre toute la carte, sans reflet' : 'Ouverture de la caméra…'}
         </p>
         <span className="w-11" />
       </div>
@@ -136,8 +178,8 @@ export function CameraCapture({
           <ImageUp />
         </button>
         <button
-          onClick={capture}
-          disabled={!ready}
+          onClick={() => void capture()}
+          disabled={!ready || busy}
           aria-label="Prendre la photo"
           className="grid h-20 w-20 place-items-center rounded-full border-4 border-white disabled:opacity-40"
         >

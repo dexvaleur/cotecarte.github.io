@@ -2,6 +2,7 @@ import { Camera, ImageUp, RotateCcw, Search, Sparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { rememberScanPhoto } from '../lib/myPhotos'
+import { mergeRecognitions } from '../scan/merge'
 import { ApiError } from '../api/cache'
 import { CameraCapture } from '../components/CameraCapture'
 import { CardThumb, useSetNames } from '../components/CardThumb'
@@ -34,15 +35,26 @@ export function ScannerScreen() {
   const navigate = useNavigate()
   const online = useOnline()
 
-  async function analyze(views: HTMLCanvasElement[]) {
-    const preview = canvasToDataUrl(views[0])
+  /**
+   * attempts : une ou plusieurs images de la même carte (rafale caméra), de la plus nette
+   * à la moins nette. Si la 1re ne suffit pas, on essaie la suivante et on combine.
+   */
+  async function analyze(attempts: HTMLCanvasElement[][]) {
+    const preview = canvasToDataUrl(attempts[0][0])
     setPhase({ name: 'analyzing', preview, step: 'Préparation…' })
     try {
-      const rec = await recognizeCard(views, (p) => {
+      const onProgress = (p: { status: string }) => {
         const step = p.status.includes('load') ? 'Chargement du lecteur de texte…' : 'Lecture du nom et du numéro…'
         setPhaseState((cur) => (cur.name === 'analyzing' && cur.step !== step ? { ...cur, step } : cur))
-      })
-      rememberScanPhoto(rec.preview)
+      }
+      let rec = await recognizeCard(attempts[0], onProgress)
+      for (const views of attempts.slice(1)) {
+        if (rec.confident) break
+        setPhaseState((cur) => (cur.name === 'analyzing' ? { ...cur, step: 'Deuxième essai avec une autre image…' } : cur))
+        const other = await recognizeCard(views, onProgress).catch(() => null)
+        if (other) rec = mergeRecognitions(rec, other)
+      }
+      rememberScanPhoto(rec.preview, rec.confident ? rec.candidates[0]?.id : undefined, `${rec.readName ?? '?'} · ${rec.readNumber ? `${rec.readNumber.raw}/${rec.readNumber.total ?? '?'}` : '?'}`)
       if (rec.confident) {
         setPhase({ name: 'results', preview: rec.preview, rec })
         navigate(`/carte/${encodeURIComponent(rec.candidates[0].id)}`)
@@ -73,7 +85,7 @@ export function ScannerScreen() {
     try {
       const canvas = await fileToCanvas(file)
       // On cherche la carte dans la photo ; sinon on recadre simplement au centre.
-      await analyze(findCard(canvas) ?? [cropToCard(canvas)])
+      await analyze([findCard(canvas) ?? [cropToCard(canvas)]])
     } catch {
       setPhase({ name: 'error', message: 'Impossible d’ouvrir cette image. Essaie une photo JPEG ou PNG.' })
     }
@@ -95,7 +107,7 @@ export function ScannerScreen() {
           // Si la carte ne remplit pas tout le cadre, on affine le recadrage.
           // Carte cherchée dans la capture élargie ; elle doit occuper l'essentiel du cadre
           // (sinon on a sans doute trouvé l'illustration) : à défaut, on prend le cadre tel quel.
-          onCapture={(framed, wide) => void analyze(findCard(wide, 0.6, true, 0.25) ?? [framed])}
+          onCapture={(shots) => void analyze(shots.map((s) => findCard(s.wide, 0.6, true, 0.25) ?? [s.framed]))}
         />
       )}
 

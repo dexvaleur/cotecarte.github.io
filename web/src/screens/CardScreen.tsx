@@ -6,7 +6,8 @@ import { getCard, getSet, setIdOf } from '../api/tcgdex'
 import type { Card, SetDetail } from '../api/types'
 import { CardImage } from '../components/CardThumb'
 import { OwnedCopies } from '../components/OwnedCopies'
-import { hasMyPhoto, recentScanPhoto, removeMyPhoto, saveMyPhotoFromDataUrl, saveMyPhotoFromFile } from '../lib/myPhotos'
+import { logFailedScan } from '../lib/scanLog'
+import { forgetScan, hasMyPhoto, recentScan, removeMyPhoto, saveMyPhotoFromDataUrl, saveMyPhotoFromFile } from '../lib/myPhotos'
 import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from '../components/ConditionCheck'
 import { PriceChart } from '../components/PriceChart'
 import { Card as Box } from '../components/ui'
@@ -108,9 +109,16 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       priceEur: ref,
     })
     setToast(`Ajoutée à ta collection (${CONDITIONS[grade ?? 'NM'].short})`)
-    // Carte sans image officielle, tout juste scannée : on garde la photo du scan.
-    const scan = recentScanPhoto()
-    if (scan && imageKind === 'none' && !hasMyPhoto(card.id)) saveMyPhotoFromDataUrl(card.id, scan).catch(() => {})
+    const scan = recentScan()
+    if (scan) {
+      // Carte sans image officielle, tout juste scannée : on garde la photo du scan.
+      if (imageKind === 'none' && !hasMyPhoto(card.id)) saveMyPhotoFromDataUrl(card.id, scan.dataUrl).catch(() => {})
+      // Le scanner n'a pas ouvert directement cette carte : on garde l'exemple pour l'améliorer.
+      if (scan.openedId !== card.id) {
+        logFailedScan({ cardId: card.id, cardName: card.name, openedId: scan.openedId, read: scan.read, dataUrl: scan.dataUrl }).catch(() => {})
+      }
+      forgetScan()
+    }
   }
 
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {

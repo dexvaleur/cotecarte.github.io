@@ -1,6 +1,8 @@
-import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
+import { Monitor, Moon, RotateCcw, Share2, Sun, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { AccountPanel } from '../components/AccountPanel'
 import { Card, ScreenTitle } from '../components/ui'
+import { clearFailedScans, shareFailedScans, useFailedScans } from '../lib/scanLog'
 import { type ThemeChoice, useTheme } from '../lib/theme'
 
 const THEMES: { value: ThemeChoice; label: string; Icon: typeof Sun }[] = [
@@ -41,6 +43,8 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
         <AccountPanel />
       </Card>
 
+      <ScanHelp />
+
       <Card className="mt-4">
         <button onClick={onReplayOnboarding} className="flex w-full items-center gap-3 font-semibold">
           <RotateCcw size={20} className="text-primary" /> Revoir la présentation
@@ -51,5 +55,52 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
         Poké Card · application non officielle, non affiliée à The Pokémon Company ou Nintendo.
       </p>
     </>
+  )
+}
+
+/** Scans ratés gardés sur le téléphone, à partager pour améliorer le scanner. */
+function ScanHelp() {
+  const scans = useFailedScans()
+  const [msg, setMsg] = useState<string | null>(null)
+  return (
+    <Card className="mt-4">
+      <h2 className="mb-1 font-bold">Améliorer le scanner</h2>
+      <p className="text-sm text-muted">
+        Quand le scanner ne trouve pas directement ta carte et que tu l’ajoutes toi-même, la photo est gardée ici
+        (sur ton téléphone uniquement).
+      </p>
+      <p className="mt-2 font-semibold">
+        {scans.length ? `${scans.length} scan${scans.length > 1 ? 's' : ''} raté${scans.length > 1 ? 's' : ''}` : 'Aucun scan raté pour l’instant 🎉'}
+      </p>
+      {scans.length > 0 && (
+        <>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {scans.slice(0, 8).map((s) => (
+              <img key={s.id} src={s.dataUrl} alt={s.cardName} className="w-14 shrink-0 rounded-lg" />
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() =>
+                shareFailedScans()
+                  .then((r) => setMsg(r === 'shared' ? null : 'Fichiers téléchargés.'))
+                  .catch(() => setMsg('Partage annulé.'))
+              }
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary py-2.5 font-bold text-primary-ink"
+            >
+              <Share2 size={18} /> Partager
+            </button>
+            <button
+              onClick={() => confirm('Effacer les scans ratés gardés ?') && clearFailedScans()}
+              aria-label="Effacer les scans ratés"
+              className="rounded-2xl border border-line px-4 text-muted"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+          {msg && <p className="mt-2 text-sm text-muted">{msg}</p>}
+        </>
+      )}
+    </Card>
   )
 }
