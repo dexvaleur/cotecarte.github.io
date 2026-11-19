@@ -1,16 +1,18 @@
 import { ImageOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { enImageBase } from '../api/enImage'
 import { ptcgImageUrl } from '../api/ptcgImage'
 import { useMyPhoto } from '../lib/myPhotos'
 import { cardImage, getSets, setIdOf } from '../api/tcgdex'
 import type { CardBrief } from '../api/types'
 
 /**
- * Image de carte, avec deux replis :
+ * Image de carte, avec plusieurs replis :
  * 1. image TCGdex ;
- * 2. si TCGdex n'en a pas (ou si elle ne charge pas) : image pokemontcg.io (il faut `cardId`) ;
- * 3. sinon : « Image indisponible ».
+ * 2. si TCGdex n'en a pas en français (ou si elle ne charge pas) : image anglaise de TCGdex ;
+ * 3. puis image pokemontcg.io (il faut `cardId`) ;
+ * 4. puis la photo de l'utilisateur ; sinon : « Image indisponible ».
  */
 export function CardImage({
   image,
@@ -34,6 +36,7 @@ export function CardImage({
   const myPhoto = useMyPhoto(cardId)
   const sources = [
     cardImage(image, quality),
+    cardId ? cardImage(enImageBase(cardId, image), quality) : undefined,
     cardId ? ptcgImageUrl(cardId, quality) : undefined,
     myPhoto,
   ].filter(
