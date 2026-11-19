@@ -6,6 +6,7 @@ import { SPECIES } from '../data/species'
 import { API_URL } from '../lib/api'
 import {
   hasMegaPrefix,
+  isTrainerText,
   looseNumbers,
   matchSpecies,
   nameSimilarity,
@@ -69,7 +70,8 @@ function textQuality(text: string, confidence: number): number {
   const words = normalize(text).split(' ')
   const known = Math.min(3, words.filter((w) => CARD_WORDS.has(w)).length)
   const hp = /\b(PV|HP)\s?\d{2,3}\b|\b\d{2,3}\s?(PV|HP)\b/i.test(text) ? 25 : 0
-  return confidence + (found.length ? 35 * found[0].score : 0) + known * 8 + hp
+  const trainer = isTrainerText(text) ? 16 : 0
+  return confidence + (found.length ? 35 * found[0].score : 0) + known * 8 + hp + trainer
 }
 
 /**
@@ -111,15 +113,28 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     if (score >= 140) break
   }
 
+  // Carte Dresseur / Énergie : le nom n'est pas un Pokémon, inutile de chercher dans la liste des espèces.
+  const trainer = isTrainerText(topText)
+
   // Numéro : contraste simple, puis seuil adaptatif, puis côté droit (anciennes cartes).
+  // Cartes Dresseur : le cadre de texte de la règle touche le numéro, on lit une zone plus étroite
+  // (et en couleurs inversées pour les cartes illustrées en entier, où le numéro est blanc).
   let bottomText = presetBottom ?? (await readText(band(card, 0.87, 0.995, 0, 0.55), onProgress, NUMBER_CHARS))
   let numbers = parseCardNumbers(bottomText)
-  for (const [left, right, mode] of [
-    [0, 0.55, 'adaptive'],
-    [0.45, 1, 'contrast'],
-  ] as const) {
+  const attempts: (readonly [number, number, number, number, 'contrast' | 'adaptive' | 'inverted'])[] = trainer
+    ? [
+        [0.9, 0.98, 0, 0.36, 'contrast'],
+        [0.9, 0.98, 0, 0.36, 'adaptive'],
+        [0.9, 0.98, 0, 0.36, 'inverted'],
+        [0.87, 0.995, 0.45, 1, 'contrast'],
+      ]
+    : [
+        [0.87, 0.995, 0, 0.55, 'adaptive'],
+        [0.87, 0.995, 0.45, 1, 'contrast'],
+      ]
+  for (const [top, bottom, left, right, mode] of attempts) {
     if (numbers.some((n) => n.total)) break
-    bottomText += '\n' + (await readText(band(card, 0.87, 0.995, left, right, mode), onProgress, NUMBER_CHARS))
+    bottomText += '\n' + (await readText(band(card, top, bottom, left, right, mode), onProgress, NUMBER_CHARS))
     numbers = parseCardNumbers(bottomText)
   }
 
@@ -127,7 +142,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   // (texte sur un bandeau de couleur), puis en couleurs inversées (texte blanc).
   let names = parseNameCandidates(topText)
   for (const mode of ['adaptive', 'inverted'] as const) {
-    if (speciesIn(names).length) break
+    if (trainer ? names.length > 0 : speciesIn(names).length) break
     const again = await readText(band(card, 0.02, 0.13, 0.03, 0.85, mode), onProgress)
     topText += '\n' + again
     names = [...new Set([...names, ...parseNameCandidates(again)])]
@@ -148,11 +163,12 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   }
 
   // Ce qu'on a compris : nom de Pokémon corrigé, suffixe (ex, V…), « Méga », numéros isolés.
-  const species = speciesIn(names)
+  const species = trainer ? [] : speciesIn(names)
   // Suffixe (ex, V…) : seulement à côté du nom. Ailleurs sur la carte, des mots comme
   // « Règle V » ou « Pokémon-ex » donneraient de fausses pistes.
-  const suffix = parseSuffix(topText) ?? species.find((m) => m.suffix)?.suffix ?? null
-  const mega = hasMegaPrefix(topText)
+  const suffix = trainer ? null : (parseSuffix(topText) ?? species.find((m) => m.suffix)?.suffix ?? null)
+  // « Méga Signal » est un Objet : le « Méga » ne compte que pour les Pokémon.
+  const mega = !trainer && hasMegaPrefix(topText)
   // Nombres isolés : seulement dans la zone du numéro (la ligne du copyright est pleine de chiffres).
   const loose = looseNumbers(bottomText)
 
@@ -166,6 +182,17 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     if (byNumber.length) {
       readNumber = n
       break
+    }
+  }
+  // Rien trouvé : le total a peut-être été mal lu d'un chiffre (6 ↔ 8, 3 ↔ 8…).
+  if (!byNumber.length) {
+    for (const n of numbers.slice(0, 2)) {
+      if (n.total === null) continue
+      byNumber = (await searchByNumber(n.raw, n.total, 2)).filter((c) => sameLocalId(c.localId, n.raw))
+      if (byNumber.length) {
+        readNumber = n
+        break
+      }
     }
   }
   byNumber.forEach((c) => pool.set(c.id, c))
@@ -246,6 +273,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     footer,
     year,
     names,
+    trainer,
     species,
     suffix,
     mega,

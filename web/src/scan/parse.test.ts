@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   hasMegaPrefix,
+  isMarkerWord,
+  isTrainerText,
   looseNumbers,
   matchSpecies,
   nameSimilarity,
@@ -138,4 +140,25 @@ test('vraie photo : logo « V » lu « y » (« Shayminy »)', () => {
 
 test('vraie photo : logo « ex » lu « e » (« Mimiquie »)', () => {
   assert.equal(matchSpecies('Mimiquie', ['Mimiqui', 'Mimigal'])?.suffix, 'ex')
+})
+
+test('cartes Dresseur : « DRESSEUR » mal lu n’est pas pris pour un nom (Cresselia)', () => {
+  for (const w of ['RESSE', 'DRESSE', 'DRESSEUR', 'upporter', 'mObjet', 'Stade']) assert.ok(isMarkerWord(w), w)
+  for (const w of ['Cresselia', 'Pikachu', 'Kassis', 'Plage']) assert.ok(!isMarkerWord(w), w)
+  assert.deepEqual(parseNameCandidates('Supporter ea DRESSE\n\n| Recherches Professorales'), [
+    'Recherches Professorales',
+    'Professorales',
+    'Recherches',
+  ])
+})
+
+test('cartes Dresseur : détection du type de carte', () => {
+  assert.ok(isTrainerText('Objet ref RES SE\n| Super Bonbon'))
+  assert.ok(isTrainerText('_ Supporter mn DRESSE\n| Kassis'))
+  assert.ok(!isTrainerText('NIVEAU 2 Dracaufeu ex PV 330'))
+})
+
+test('noms en plusieurs mots : « de », « du » ne comptent pas', () => {
+  assert.equal(nameSimilarity('Terrain Plage', 'Terrain de Plage'), 1)
+  assert.equal(nameSimilarity('Ordres Boss', 'Ordres du Boss'), 1)
 })
