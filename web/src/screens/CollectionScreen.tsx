@@ -11,13 +11,13 @@ import { Card, ScreenTitle } from '../components/ui'
 import { CONDITIONS, type ConditionCode, rarityInfo } from '../data/cardInfo'
 import { useSession } from '../lib/api'
 import { type CollectionItem, removeItem, removeWish, updateItem, useCollectionState } from '../lib/collection'
+import { arrange, dexNumber, SORT_MODES, type SortMode } from '../lib/collectionSort'
 import { formatEur } from '../lib/format'
 import { load, save } from '../lib/storage'
 import { useCardPrices } from '../lib/useCardPrices'
 import { recordLocalValue, useValueHistory } from '../lib/valueHistory'
 
 type Tab = 'cards' | 'sets' | 'wish'
-type Sort = 'value' | 'recent' | 'name' | 'set'
 const VALUE_BUCKETS = [
   { id: 'all', label: 'Toutes', min: 0, max: Infinity },
   { id: 'lt1', label: '< 1 €', min: 0, max: 1 },
@@ -160,7 +160,15 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
   const [rarityFilter, setRarityFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [bucket, setBucket] = useState<(typeof VALUE_BUCKETS)[number]['id']>('all')
-  const [sort, setSort] = useState<Sort>('value')
+  const [sort, setSort] = useState<SortMode>(() => load<SortMode>('collectionSort', 'value'))
+  useEffect(() => save('collectionSort', sort), [sort])
+  // Ordre de sortie des extensions (pour ranger « Par extension », de la plus récente à la plus ancienne).
+  const [setOrder, setSetOrder] = useState<Map<string, number>>(new Map())
+  useEffect(() => {
+    getSets('fr')
+      .then((list) => setSetOrder(new Map(list.map((s, i) => [s.id, i]))))
+      .catch(() => {})
+  }, [])
 
   // Infos complétées par les prix du jour (rareté, types) pour les cartes anciennes.
   const rows = useMemo(
@@ -190,15 +198,22 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
     .filter((r) => !rarityFilter || r.rarity === rarityFilter)
     .filter((r) => !typeFilter || r.types.includes(typeFilter))
     .filter((r) => r.unit >= b.min && r.unit < b.max)
-    .sort((x, y) =>
-      sort === 'value'
-        ? y.unit - x.unit
-        : sort === 'recent'
-          ? y.item.addedAt.localeCompare(x.item.addedAt)
-          : sort === 'name'
-            ? x.item.name.localeCompare(y.item.name)
-            : x.item.setName.localeCompare(y.item.setName) || x.item.localId.localeCompare(y.item.localId, 'fr', { numeric: true }),
-    )
+  const hasPurchase = rows.some((r) => r.item.purchasePrice)
+  const modes = SORT_MODES.filter((m) => m.id !== 'gain' || hasPurchase)
+  const mode = modes.some((m) => m.id === sort) ? sort : 'value'
+  const groups = arrange(filtered, mode, setOrder)
+  /** Petite info sous chaque carte, selon le rangement choisi. */
+  const extra = (r: (typeof rows)[number]) => {
+    if (mode === 'dex') {
+      const n = dexNumber(r.item.name)
+      return n ? `n° ${String(n).padStart(3, '0')}` : null
+    }
+    if (mode === 'gain' && r.item.purchasePrice) {
+      const g = r.unit - r.item.purchasePrice
+      return `${g >= 0 ? '+' : ''}${formatEur(g)}`
+    }
+    return null
+  }
   const activeFilters = [setFilter, rarityFilter, typeFilter, bucket !== 'all' ? bucket : ''].filter(Boolean).length
 
   return (
@@ -251,6 +266,23 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
         </button>
       </div>
 
+      <div role="radiogroup" aria-label="Ranger par" className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            role="radio"
+            aria-checked={mode === m.id}
+            onClick={() => setSort(m.id)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold whitespace-nowrap ${
+              mode === m.id ? 'bg-primary text-primary-ink' : 'border border-line bg-surface'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1 text-xs text-muted">{modes.find((m) => m.id === mode)?.hint}</p>
+
       {showFilters && (
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-line bg-surface p-3 text-sm">
           <Select label="Extension" value={setFilter} onChange={setSetFilter} options={sets.map(([id, name]) => [id, name])} />
@@ -261,18 +293,6 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
             value={bucket === 'all' ? '' : bucket}
             onChange={(v) => setBucket((v || 'all') as typeof bucket)}
             options={VALUE_BUCKETS.filter((v) => v.id !== 'all').map((v) => [v.id, v.label])}
-          />
-          <Select
-            label="Trier par"
-            value={sort}
-            onChange={(v) => setSort((v || 'value') as Sort)}
-            options={[
-              ['value', 'Valeur'],
-              ['recent', 'Ajout récent'],
-              ['name', 'Nom'],
-              ['set', 'Extension'],
-            ]}
-            noAll
           />
           {activeFilters > 0 && (
             <button
@@ -295,28 +315,47 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
         {view === 'grid' && filtered.length > 0 && ' · touche une carte pour la retirer ou changer la quantité'}
       </p>
 
-      {view === 'grid' ? (
-        <div className="grid grid-cols-3 gap-2">
-          {filtered.map(({ item, unit }) => (
-            <Link key={item.uid} to={`/carte/${encodeURIComponent(item.cardId)}`} className="relative block">
-              <CardImage image={item.image} cardId={item.cardId} alt={item.name} />
-              {item.quantity > 1 && (
-                <span className="absolute top-1 right-1 rounded-full bg-ink px-2 text-xs font-bold text-bg">×{item.quantity}</span>
-              )}
-              <p className="mt-1 truncate text-xs font-bold">{item.name}</p>
-              <p className="text-[11px] text-muted">
-                {CONDITIONS[item.condition].short} · <b className="text-ink">{formatEur(unit)}</b>
-              </p>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {filtered.map(({ item, unit }) => (
-            <ItemRow key={item.uid} item={item} unit={unit} />
-          ))}
-        </ul>
-      )}
+      {groups.map((g) => (
+        <section key={g.key} className={g.title ? 'mb-5' : ''}>
+          {g.title && (
+            <h3 className="sticky top-14 z-10 -mx-4 mb-2 flex items-center gap-2 bg-bg/95 px-4 py-2 backdrop-blur">
+              {g.color && <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color }} aria-hidden />}
+              <span className="truncate font-extrabold">{g.title}</span>
+              <span className="ml-auto shrink-0 text-xs text-muted">
+                {g.count} carte{g.count > 1 ? 's' : ''} · <b className="text-ink">{formatEur(g.value)}</b>
+              </span>
+            </h3>
+          )}
+          {view === 'grid' ? (
+            <div className="grid grid-cols-3 gap-2">
+              {g.rows.map((r) => (
+                <Link key={r.item.uid} to={`/carte/${encodeURIComponent(r.item.cardId)}`} className="relative block">
+                  <CardImage image={r.item.image} cardId={r.item.cardId} alt={r.item.name} />
+                  {r.item.quantity > 1 && (
+                    <span className="absolute top-1 right-1 rounded-full bg-ink px-2 text-xs font-bold text-bg">×{r.item.quantity}</span>
+                  )}
+                  <p className="mt-1 truncate text-xs font-bold">{r.item.name}</p>
+                  <p className="truncate text-[11px] text-muted">
+                    {extra(r) ? (
+                      <b className={mode === 'gain' && r.unit < (r.item.purchasePrice ?? 0) ? 'text-bad' : mode === 'gain' ? 'text-good' : 'text-ink'}>{extra(r)}</b>
+                    ) : (
+                      <>
+                        {CONDITIONS[r.item.condition].short} · <b className="text-ink">{formatEur(r.unit)}</b>
+                      </>
+                    )}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {g.rows.map((r) => (
+                <ItemRow key={r.item.uid} item={r.item} unit={r.unit} />
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
     </>
   )
 }
