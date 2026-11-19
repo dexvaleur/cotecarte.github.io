@@ -11,7 +11,7 @@ import { timeAgo } from '../lib/format'
  */
 export function AccountPanel({ compact = false }: { compact?: boolean }) {
   const session = useSession()
-  const { sync, lastSync, syncError, outbox, collection, wishlist } = useCollectionState()
+  const { sync, lastSync, syncError, outbox, collection, wishlist, binders } = useCollectionState()
 
   if (!API_URL) {
     if (compact) return null
@@ -75,6 +75,7 @@ export function AccountPanel({ compact = false }: { compact?: boolean }) {
             compte: { email: session.user.email },
             collection,
             wishlist,
+            classeurs: binders,
           })
         }
         className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2.5 text-sm font-semibold"

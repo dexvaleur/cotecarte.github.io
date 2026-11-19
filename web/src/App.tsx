@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { AppShell } from './components/AppShell'
 import { CardScreen } from './screens/CardScreen'
+import { BinderScreen, NewBinderScreen } from './screens/Binders'
 import { SearchScreen } from './screens/SearchScreen'
 import { SetScreen } from './screens/SetScreen'
 import { load, save } from './lib/storage'
@@ -43,6 +44,8 @@ export default function App() {
         <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => setOnboarded(false)} />} />
         <Route path="glossaire" element={<GlossaryScreen />} />
         <Route path="stats" element={<StatsScreen />} />
+        <Route path="classeurs/nouveau" element={<NewBinderScreen />} />
+        <Route path="classeurs/:id" element={<BinderScreen />} />
         <Route path="legal/:page?" element={<LegalScreen />} />
         <Route path="recherche" element={<SearchScreen />} />
         <Route path="carte/:id" element={<CardScreen />} />

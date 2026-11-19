@@ -34,6 +34,27 @@ const wishSchema = z.object({
   addedAt: z.string().datetime().optional(),
 })
 
+// Une case de classeur : une carte (possédée ou non), ou vide (null).
+const slotSchema = z
+  .object({
+    cardId: z.string().min(1).max(64),
+    name: z.string().min(1).max(200),
+    image: z.string().url().max(500).optional().nullable(),
+    setName: z.string().max(200).optional().nullable(),
+    localId: z.string().max(32).optional().nullable(),
+  })
+  .nullable()
+
+const binderSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  perPage: z.union([z.literal(4), z.literal(9), z.literal(12)]),
+  slots: z.array(slotSchema).max(2000),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+})
+export type BinderData = z.infer<typeof binderSchema>
+
 interface ItemRow {
   uid: string
   card_id: string
@@ -81,8 +102,10 @@ export async function collectionRoutes(app: FastifyInstance, { db }: { db: Db })
       'SELECT * FROM wishlist WHERE user_id = $1 ORDER BY added_at',
       [userId],
     )
+    const binders = await db.query<{ id: string; data: BinderData }>('SELECT id, data FROM binders WHERE user_id = $1', [userId])
     return {
       items: items.map(toItem),
+      binders: binders.map((b) => ({ id: b.id, ...(typeof b.data === 'string' ? JSON.parse(b.data) : b.data) })),
       wishlist: wishlist.map((w) => ({
         cardId: w.card_id,
         name: w.name,
@@ -91,6 +114,23 @@ export async function collectionRoutes(app: FastifyInstance, { db }: { db: Db })
         addedAt: new Date(w.added_at).toISOString(),
       })),
     }
+  })
+
+  // Classeurs : ajout ou mise à jour (le plus récent gagne), et suppression.
+  app.put<{ Params: { id: string } }>('/binders/:id', async (req, reply) => {
+    const id = z.string().uuid().safeParse(req.params.id)
+    const body = binderSchema.safeParse(req.body)
+    if (!id.success || !body.success) return reply.code(400).send({ error: 'Classeur invalide.' })
+    const ok = await upsertBinder(db, req.user!.id, id.data, body.data)
+    if (!ok) return reply.code(409).send({ error: 'Ce classeur appartient à un autre compte.' })
+    return { ok: true }
+  })
+
+  app.delete<{ Params: { id: string } }>('/binders/:id', async (req, reply) => {
+    const id = z.string().uuid().safeParse(req.params.id)
+    if (!id.success) return reply.code(400).send({ error: 'Identifiant invalide.' })
+    await db.query('DELETE FROM binders WHERE id = $1 AND user_id = $2', [id.data, req.user!.id])
+    return { ok: true }
   })
 
   // Ajoute ou met à jour un exemplaire.
@@ -128,12 +168,14 @@ export async function collectionRoutes(app: FastifyInstance, { db }: { db: Db })
       .object({
         items: z.array(itemSchema.extend({ uid: z.string().uuid() })).max(5000),
         wishlist: z.array(wishSchema.extend({ cardId: z.string().min(1).max(64) })).max(2000),
+        binders: z.array(binderSchema.extend({ id: z.string().uuid() })).max(100).default([]),
       })
       .safeParse(req.body)
     if (!body.success) return reply.code(400).send({ error: 'Données invalides.' })
     let imported = 0
     for (const item of body.data.items) if (await upsertItem(db, req.user!.id, item.uid, item)) imported++
     for (const wish of body.data.wishlist) await upsertWish(db, req.user!.id, wish.cardId, wish)
+    for (const { id, ...binder } of body.data.binders) await upsertBinder(db, req.user!.id, id, binder)
     return { ok: true, imported }
   })
 
@@ -188,4 +230,19 @@ async function upsertWish(db: Db, userId: string, cardId: string, w: z.infer<typ
      ON CONFLICT (user_id, card_id) DO NOTHING`,
     [userId, cardId, w.name, w.image ?? null, w.setName, w.addedAt ?? null],
   )
+}
+
+/** Enregistre un classeur, sauf si le serveur a déjà une version plus récente. Faux si l'id est à un autre compte. */
+async function upsertBinder(db: Db, userId: string, id: string, data: BinderData): Promise<boolean> {
+  const rows = await db.query<{ id: string }>(
+    `INSERT INTO binders (id, user_id, data, updated_at) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
+       WHERE binders.user_id = EXCLUDED.user_id AND binders.updated_at <= EXCLUDED.updated_at
+     RETURNING id`,
+    [id, userId, JSON.stringify(data), data.updatedAt],
+  )
+  if (rows.length) return true
+  // Rien d'écrit : soit une version plus récente existe déjà (normal), soit l'id est à quelqu'un d'autre.
+  const [owner] = await db.query<{ user_id: string }>('SELECT user_id FROM binders WHERE id = $1', [id])
+  return owner?.user_id === userId
 }
