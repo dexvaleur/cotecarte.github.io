@@ -12,6 +12,7 @@ import { LegalScreen } from './screens/LegalScreen'
 import { NewsScreen } from './screens/NewsScreen'
 import { Onboarding } from './screens/Onboarding'
 import { PacksScreen } from './screens/PacksScreen'
+import { AvatarEditorScreen, ProfileScreen } from './screens/ProfileScreen'
 import { ScannerScreen } from './screens/ScannerScreen'
 import { SellScreen } from './screens/SellScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
@@ -42,6 +43,8 @@ export default function App() {
         <Route path="actus" element={<NewsScreen />} />
         <Route path="vendre" element={<SellScreen />} />
         <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => setOnboarded(false)} />} />
+        <Route path="profil" element={<ProfileScreen />} />
+        <Route path="profil/avatar" element={<AvatarEditorScreen />} />
         <Route path="glossaire" element={<GlossaryScreen />} />
         <Route path="stats" element={<StatsScreen />} />
         <Route path="classeurs/nouveau" element={<NewBinderScreen />} />

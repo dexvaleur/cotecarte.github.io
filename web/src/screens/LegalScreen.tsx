@@ -143,7 +143,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
           <b>Les photos du scanner</b> : elles sont analysées directement sur ton téléphone. Elles ne sont jamais
           envoyées sur notre serveur. Les « scans ratés » ne sont partagés que si tu appuies toi-même sur « Partager ».
         </li>
-        <li>Ta collection, ta wishlist, tes photos de cartes et tes réglages (thème, etc.).</li>
+        <li>Ta collection, ta wishlist, tes classeurs, ton profil (pseudo, avatar), tes photos de cartes et tes réglages (thème, etc.).</li>
       </ul>
       <p>
         Ces données sont rangées dans le stockage de l’appli sur ton appareil (pas de cookie publicitaire). Ce stockage
@@ -173,6 +173,10 @@ const PAGES: Record<LegalPageId, ReactNode> = {
         <li>
           <b>Ta collection et ta wishlist</b> (cartes, état, quantité, prix d’achat si tu l’indiques) : pour les
           sauvegarder et les retrouver sur tous tes appareils.
+        </li>
+        <li>
+          <b>Ton profil</b> (pseudo et réglages de ton avatar) : pour le retrouver sur tous tes appareils. Il n’est
+          visible par personne d’autre que toi.
         </li>
         <li>
           <b>Données techniques</b> : la date d’acceptation des conditions, des empreintes chiffrées des codes et des

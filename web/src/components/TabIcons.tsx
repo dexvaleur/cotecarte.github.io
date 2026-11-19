@@ -1,3 +1,5 @@
+import { AvatarView } from './AvatarView'
+import { useProfile } from '../lib/profile'
 /**
  * Icônes des onglets, dessinées comme des objets d'aventure :
  * Pokédex (scanner), classeur (collection), booster (packs), radio (actus), pièce (vendre).
@@ -119,5 +121,17 @@ export function CoinIcon({ active }: IconProps) {
       <path d="M16 9.5l1.7 3.6 3.9.4-2.9 2.6.8 3.9-3.5-2-3.5 2 .8-3.9-2.9-2.6 3.9-.4z" fill="#fff6c9" stroke="#b77800" strokeWidth=".9" strokeLinejoin="round" />
       <path d="M8.5 10.5a9 9 0 0 1 4-3.5" stroke="#fff" strokeOpacity=".8" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </Frame>
+  )
+}
+
+/** Profil : la tête de l'avatar du dresseur dans un rond. */
+export function ProfileIcon({ active }: IconProps) {
+  const { avatar } = useProfile()
+  return (
+    <span
+      className={`grid h-7 w-7 place-items-center overflow-hidden rounded-full border-2 bg-primary-soft transition ${active ? 'scale-110 border-primary' : 'border-line opacity-85'}`}
+    >
+      <AvatarView a={avatar} crop="head" className="h-8 w-8 translate-y-0.5" />
+    </span>
   )
 }

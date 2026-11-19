@@ -343,6 +343,18 @@ describe('classeurs', () => {
   })
 })
 
+test('profil : pseudo et avatar enregistrés, refus si trop gros', async () => {
+  const token = await login('profil@example.com')
+  const auth = { authorization: `Bearer ${token}` }
+  assert.equal((await app.inject({ method: 'GET', url: '/profile', headers: auth })).json().profile, null)
+  const body = { pseudo: 'Sacha', avatar: { gender: 'boy', height: 0.5, skin: '#c68642' }, updatedAt: '2026-11-19T10:00:00.000Z' }
+  assert.equal((await app.inject({ method: 'PUT', url: '/profile', headers: auth, payload: body })).statusCode, 200)
+  assert.equal((await app.inject({ method: 'GET', url: '/profile', headers: auth })).json().profile.pseudo, 'Sacha')
+  const big = { ...body, pseudo: 'x'.repeat(50) }
+  assert.equal((await app.inject({ method: 'PUT', url: '/profile', headers: auth, payload: big })).statusCode, 400)
+  assert.equal((await app.inject({ method: 'GET', url: '/profile' })).statusCode, 401)
+})
+
 describe('statistiques de visite', () => {
   test('compteurs anonymes par jour, visibles par l’administrateur seulement', async () => {
     const hit = (events: unknown) => app.inject({ method: 'POST', url: '/stats/hit', payload: { events } })
