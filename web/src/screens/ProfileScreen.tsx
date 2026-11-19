@@ -65,8 +65,8 @@ export function ProfileScreen() {
   return (
     <>
       <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-primary-soft to-surface">
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-good/20 to-transparent" />
-        <AvatarView a={profile.avatar} className="relative mx-auto h-72 w-auto" />
+        <div className="pointer-events-none absolute -top-10 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-surface/70 blur-2xl" />
+        <AvatarView a={profile.avatar} crop="bust" className="relative mx-auto -mb-px block h-64 w-auto pt-4" />
         <Link
           to="/profil/avatar"
           className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-sm font-bold text-primary-ink shadow"
@@ -189,7 +189,7 @@ export function AvatarEditorScreen() {
               onClick={() => set(k, v as Avatar[K])}
               className={`flex flex-col items-center rounded-2xl border-2 p-1 text-[11px] leading-tight font-semibold ${on ? 'border-primary bg-primary-soft' : 'border-line bg-surface'}`}
             >
-              {crop !== 'none' && <AvatarView a={{ ...a, [k]: v }} crop={crop} className={crop === 'head' ? 'h-14 w-14' : 'h-20 w-14'} />}
+              {crop !== 'none' && <AvatarView a={{ ...a, [k]: v }} crop={crop} className={crop === 'head' ? 'h-14 w-14' : 'h-24 w-12'} />}
               <span className="py-1">{label}</span>
             </button>
           )
@@ -251,7 +251,7 @@ export function AvatarEditorScreen() {
           <button onClick={() => navigate('/profil')} aria-label="Retour" className="rounded-full p-2">
             <ArrowLeft size={22} />
           </button>
-          <AvatarView a={a} className="h-44 w-auto" />
+          <AvatarView a={a} className="h-56 w-auto" />
           <div className="flex flex-col gap-2">
             <button onClick={() => setA(randomAvatar())} className="flex items-center gap-1 rounded-full bg-surface-2 px-3 py-1.5 text-sm font-bold">
               <Dices size={16} /> Hasard
