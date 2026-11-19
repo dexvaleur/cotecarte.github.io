@@ -1,4 +1,4 @@
-# Cote Carte
+# DexValeur
 
 Application mobile (PWA) pour les collectionneurs de cartes Pokémon débutants : scanne une carte, découvre ce qu'elle est et combien elle vaut, gère ta collection, choisis tes boosters, suis l'actu et revends tes cartes.
 

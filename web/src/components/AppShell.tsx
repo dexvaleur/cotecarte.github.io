@@ -14,7 +14,7 @@ export function AppShell() {
           <Link to="/scanner" className="flex items-center gap-2 font-extrabold tracking-tight">
             <img src="./favicon.svg" alt="" className="h-8 w-8" />
             <span className="text-lg">
-              Cote <span className="text-primary">Carte</span>
+              Dex<span className="text-primary">Valeur</span>
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-1">

@@ -75,7 +75,7 @@ async function cardArticles(fetchImpl: typeof fetch): Promise<Article[]> {
   const lists = await Promise.all(
     FEEDS.map(async (f) => {
       try {
-        const res = await fetchImpl(f.url, { signal: AbortSignal.timeout(10_000), headers: { 'user-agent': 'CoteCarte/1.0 (lecteur RSS)' } })
+        const res = await fetchImpl(f.url, { signal: AbortSignal.timeout(10_000), headers: { 'user-agent': 'DexValeur/1.0 (lecteur RSS)' } })
         return res.ok ? parseRss(await res.text(), f.source) : []
       } catch {
         return []
