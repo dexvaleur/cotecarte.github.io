@@ -151,6 +151,19 @@ const PAGES: Record<LegalPageId, ReactNode> = {
         en supprimant les données du site dans ton navigateur.
       </p>
 
+      <H>Statistiques de visite (sans cookie)</H>
+      <p>
+        Pour savoir combien de personnes utilisent l’appli, elle envoie à notre serveur un simple signal anonyme quand tu
+        l’ouvres ou que tu scannes une carte. Le serveur ne fait qu’additionner des compteurs par jour (nombre de
+        visiteurs, d’ouvertures et de scans) : <b>aucune adresse IP, aucun identifiant, aucun cookie</b> n’est
+        enregistré pour ces statistiques, et elles ne sont partagées avec personne.
+      </p>
+      <p>
+        Pour ne compter chaque visiteur qu’une fois par jour, l’appli garde seulement sur ton téléphone la date de sa
+        dernière visite. Cette mesure d’audience respecte les conditions de la CNIL pour être dispensée de consentement.
+        Tu peux quand même la désactiver à tout moment dans <b>Réglages → Statistiques de visite anonymes</b>.
+      </p>
+
       <H>Si tu crées un compte</H>
       <ul className="list-disc space-y-1 pl-5">
         <li>

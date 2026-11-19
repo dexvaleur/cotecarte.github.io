@@ -1,8 +1,11 @@
-import { Monitor, Moon, RotateCcw, Share2, Sun, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { BarChart3, ChevronRight, Monitor, Moon, RotateCcw, Share2, Sun, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { AccountPanel } from '../components/AccountPanel'
 import { Card, ScreenTitle } from '../components/ui'
 import { LegalLinks } from './LegalScreen'
+import { fetchIsAdmin, useSession } from '../lib/api'
+import { useStatsChoice } from '../lib/stats'
 import { clearFailedScans, shareFailedScans, useFailedScans } from '../lib/scanLog'
 import { type ThemeChoice, useTheme } from '../lib/theme'
 
@@ -44,7 +47,11 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
         <AccountPanel />
       </Card>
 
+      <AdminLink />
+
       <ScanHelp />
+
+      <StatsChoice />
 
       <Card className="mt-4">
         <button onClick={onReplayOnboarding} className="flex w-full items-center gap-3 font-semibold">
@@ -58,6 +65,50 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
       </p>
       <LegalLinks className="mt-2" />
     </>
+  )
+}
+
+/** Lien vers les statistiques, visible seulement par l'administrateur. */
+function AdminLink() {
+  const session = useSession()
+  const [admin, setAdmin] = useState(false)
+  useEffect(() => {
+    if (!session) return setAdmin(false)
+    fetchIsAdmin()
+      .then(setAdmin)
+      .catch(() => setAdmin(false))
+  }, [session])
+  if (!admin) return null
+  return (
+    <Link to="/stats" className="mt-4 flex items-center gap-3 rounded-3xl border border-line bg-surface p-4 font-semibold">
+      <BarChart3 size={20} className="text-primary" /> Statistiques de l’appli
+      <ChevronRight size={18} className="ml-auto text-muted" />
+    </Link>
+  )
+}
+
+/** Choix d'être compté ou non dans les statistiques de visite anonymes. */
+function StatsChoice() {
+  const { enabled, setEnabled } = useStatsChoice()
+  return (
+    <Card className="mt-4">
+      <label className="flex items-center gap-3">
+        <span className="flex-1">
+          <span className="block font-bold">Statistiques de visite anonymes</span>
+          <span className="block text-sm text-muted">
+            Aide à savoir combien de personnes utilisent l’appli. Aucun cookie, rien qui permette de t’identifier.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="h-6 w-6 shrink-0 accent-primary"
+          aria-label="Statistiques de visite anonymes"
+        />
+      </label>
+    </Card>
   )
 }
 

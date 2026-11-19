@@ -21,6 +21,8 @@ const schema = z.object({
    * Vide = tout le monde peut créer un compte.
    */
   ALLOWED_EMAILS: z.string().default(''),
+  /** Emails des administrateurs (accès aux statistiques), séparés par des virgules. */
+  ADMIN_EMAILS: z.string().default(''),
   /** Envoi des emails. Vide = les codes s'affichent dans le terminal (développement). */
   SMTP_URL: z.string().optional(),
   /** Clé API Brevo (envoi par HTTPS, prioritaire sur SMTP_URL). Utile si l'hébergeur bloque le SMTP. */
