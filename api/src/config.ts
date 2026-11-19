@@ -23,6 +23,8 @@ const schema = z.object({
   ALLOWED_EMAILS: z.string().default(''),
   /** Envoi des emails. Vide = les codes s'affichent dans le terminal (développement). */
   SMTP_URL: z.string().optional(),
+  /** Clé API Brevo (envoi par HTTPS, prioritaire sur SMTP_URL). Utile si l'hébergeur bloque le SMTP. */
+  BREVO_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().default('Poké Card <no-reply@pokecard.local>'),
   /** Adresse de TCGdex (modifiable pour les tests). */
   TCGDEX_URL: z.string().default('https://api.tcgdex.net'),
@@ -34,7 +36,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const config = schema.parse(env)
   if (config.NODE_ENV === 'production') {
     if (config.AUTH_SECRET.startsWith('change-moi')) throw new Error('AUTH_SECRET doit être défini en production.')
-    if (!config.SMTP_URL) throw new Error('SMTP_URL doit être défini en production pour envoyer les codes.')
+    if (!config.SMTP_URL && !config.BREVO_API_KEY)
+      throw new Error('BREVO_API_KEY (ou SMTP_URL) doit être défini en production pour envoyer les codes.')
   }
   return config
 }

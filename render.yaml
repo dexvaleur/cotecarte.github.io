@@ -18,6 +18,9 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      # Envoi des emails par l'API Brevo (Render gratuit bloque le SMTP)
+      - key: BREVO_API_KEY
+        sync: false
       - key: SMTP_URL
         sync: false
       - key: MAIL_FROM
