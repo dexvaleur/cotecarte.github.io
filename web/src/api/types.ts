@@ -47,6 +47,7 @@ export interface TypeValue {
 export interface CardmarketPrices {
   updated?: string
   unit?: string
+  idProduct?: number
   avg?: number | null
   low?: number | null
   trend?: number | null
