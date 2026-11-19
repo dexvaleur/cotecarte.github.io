@@ -2,11 +2,13 @@ import { cardImage, getSet, getSets, searchByName, searchByNumber, setIdOf } fro
 import type { CardBrief } from '../api/types'
 import { band, dHash, hashSimilarity, loadImage } from './image'
 import { readText, readTextWithConfidence, type OcrProgress } from './ocr'
-import { SPECIES } from '../data/species'
+import { splitCardId, type AsianLang } from '../api/cardId'
+import { SPECIES, speciesNames } from '../data/species'
 import { API_URL } from '../lib/api'
 import {
   hasMegaPrefix,
   isTrainerText,
+  levenshtein,
   looseNumbers,
   matchSpecies,
   nameSimilarity,
@@ -46,6 +48,41 @@ export interface Recognition {
   confident: boolean
 }
 
+// Code d'extension (« sv4a ») + numéro.
+const SET_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/'
+
+/**
+ * Cherche l'extension d'après le code lu (« sv4a » → extension « SV4a »), puis la carte
+ * avec l'un des numéros lus. Les confusions courantes (O/0, I/l/1) sont corrigées.
+ */
+async function findBySetCode(lang: AsianLang, text: string, nums: string[]): Promise<{ card: CardBrief; total: number }[]> {
+  const tokens = [...new Set(text.match(/[A-Za-z][A-Za-z0-9]{1,6}/g) ?? [])]
+  if (!tokens.length || !nums.length) return []
+  const clean = (t: string) => t.toLowerCase().replace(/o/g, '0').replace(/[il|]/g, '1')
+  const sets = await getSets(lang).catch(() => [])
+  const codes = sets.map((s) => ({ set: s, code: clean(splitCardId(s.id).raw) }))
+  // Code exact d'abord ; sinon à une lettre près (« sv4e » lu pour « sv4a »), en vérifiant que le numéro existe.
+  const variants = tokens.flatMap((t) => [t, t.slice(1), t.slice(0, -1)]).map(clean).filter((v) => v.length >= 2)
+  const exact = codes.filter((c) => variants.includes(c.code))
+  const close = exact.length ? [] : codes.filter((c) => c.code.length >= 3 && variants.some((v) => v.length === c.code.length && levenshtein(v, c.code) === 1))
+  const out: { card: CardBrief; total: number }[] = []
+  for (const { set } of [...exact, ...close].slice(0, 6)) {
+    try {
+      const { data } = await getSet(set.id)
+      for (const n of nums) {
+        const card = data.cards.find((c) => sameLocalId(c.localId, n))
+        if (card) {
+          out.push({ card, total: set.cardCount.official })
+          break
+        }
+      }
+    } catch {
+      /* extension indisponible */
+    }
+  }
+  return out
+}
+
 // Chiffres et « / » seulement : avec des lettres, l'OCR confond « 0 » et « D », « 2 » et « Z »…
 const NUMBER_CHARS = '0123456789/'
 
@@ -78,7 +115,15 @@ function textQuality(text: string, confidence: number): number {
  * `views` : une ou plusieurs versions de la carte redressée (ex. dans les deux sens,
  * quand on ne sait pas où est le haut). On garde celle où l'OCR lit le mieux.
  */
-export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: OcrProgress): Promise<Recognition> {
+/**
+ * Langue des cartes scannées. « auto » : cartes françaises, anglaises, allemandes, italiennes,
+ * espagnoles, portugaises… (mêmes extensions et numéros partout). Les cartes asiatiques ont
+ * leurs propres extensions : on les reconnaît par leur numéro et leur illustration.
+ */
+export type ScanLang = 'auto' | AsianLang
+
+export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: OcrProgress, lang: ScanLang = 'auto'): Promise<Recognition> {
+  const asian = lang !== 'auto'
   // --- 1. OCR -----------------------------------------------------------
   // Le nom est en haut à gauche ; le numéro en bas à gauche (cartes récentes)
   // ou en bas à droite (anciennes cartes).
@@ -86,6 +131,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   let topText = ''
   let bestView = -Infinity
   let presetBottom: string | null = null
+  const viewLog: { index: number; score: number; bottom: string | null }[] = []
   for (const [index, view] of views.entries()) {
     // On lit le haut de la carte ; si aucun nom n'est reconnu, on réessaie avec un seuil adaptatif.
     const r = await readTextWithConfidence(band(view, 0.02, 0.13, 0.03, 0.85), onProgress)
@@ -101,8 +147,19 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     let bottom: string | null = null
     if (views.length > 1) {
       bottom = await readText(band(view, 0.87, 0.995, 0, 0.55), onProgress, NUMBER_CHARS)
-      if (parseCardNumbers(bottom).some((n) => n.total)) score += 40
+      // Seulement un numéro plausible (« 030/106 ») : à l'envers, on lit parfois des chiffres au hasard (« 0/0 »).
+      const plausibleNumber = (t: string) => parseCardNumbers(t).some((n) => n.total && n.total >= 10 && n.total <= 400 && n.num <= n.total * 1.6)
+      if (plausibleNumber(bottom)) score += 40
+      else if (asian) {
+        // Cartes asiatiques : le haut ne se lit pas, donc on regarde de plus près le bas.
+        // La ligne du numéro seule, puis l'année du copyright (« ©2024 ») tout en bas : seulement dans le bon sens.
+        const line = await readText(band(view, 0.9, 0.975, 0.1, 0.42), onProgress, NUMBER_CHARS)
+        bottom += '\n' + line
+        if (plausibleNumber(line)) score += 40
+        else if (/20[0-3]\d/.test(await readText(band(view, 0.955, 1, 0.15, 0.85), onProgress, NUMBER_CHARS))) score += 30
+      }
     }
+    viewLog.push({ index, score: Math.round(score), bottom })
     if (score > bestView) {
       bestView = score
       card = view
@@ -132,8 +189,13 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
         [0.87, 0.995, 0, 0.55, 'adaptive'],
         [0.87, 0.995, 0.45, 1, 'contrast'],
       ]
+  // Dernier recours : juste la ligne du numéro, après le code de l'extension (cartes récentes,
+  // utile quand le texte voisin gêne, ex. le texte d'ambiance des cartes japonaises).
+  attempts.push([0.9, 0.975, 0.1, 0.42, 'contrast'], [0.9, 0.975, 0.1, 0.42, 'adaptive'])
+  // Un numéro « plausible » : le total lu, et un numéro pas trop loin de ce total (« 100/18 » est sans doute mal lu).
+  const plausible = () => numbers.some((n) => n.total && n.total >= 10 && n.total <= 400 && n.num <= n.total * 1.6)
   for (const [top, bottom, left, right, mode] of attempts) {
-    if (numbers.some((n) => n.total)) break
+    if (plausible()) break
     bottomText += '\n' + (await readText(band(card, top, bottom, left, right, mode), onProgress, NUMBER_CHARS))
     numbers = parseCardNumbers(bottomText)
   }
@@ -141,8 +203,10 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   // Nom : si aucun nom de Pokémon n'est reconnu, on relit avec un seuil adaptatif
   // (texte sur un bandeau de couleur), puis en couleurs inversées (texte blanc).
   let names = parseNameCandidates(topText)
+  // Cartes asiatiques : le nom n'est pas en lettres latines, inutile d'insister.
+  if (asian) names = []
   for (const mode of ['adaptive', 'inverted'] as const) {
-    if (trainer ? names.length > 0 : speciesIn(names).length) break
+    if (asian || (trainer ? names.length > 0 : speciesIn(names).length)) break
     const again = await readText(band(card, 0.02, 0.13, 0.03, 0.85, mode), onProgress)
     topText += '\n' + again
     names = [...new Set([...names, ...parseNameCandidates(again)])]
@@ -178,7 +242,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   let byNumber: CardBrief[] = []
   for (const n of numbers.slice(0, 3)) {
     if (n.total === null) continue
-    byNumber = await searchByNumber(n.raw, n.total)
+    byNumber = await searchByNumber(n.raw, n.total, 0, asian ? lang : 'fr')
     if (byNumber.length) {
       readNumber = n
       break
@@ -188,7 +252,34 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   if (!byNumber.length) {
     for (const n of numbers.slice(0, 2)) {
       if (n.total === null) continue
-      byNumber = (await searchByNumber(n.raw, n.total, 2)).filter((c) => sameLocalId(c.localId, n.raw))
+      byNumber = (await searchByNumber(n.raw, n.total, 2, asian ? lang : 'fr')).filter((c) => sameLocalId(c.localId, n.raw))
+      if (byNumber.length) {
+        readNumber = n
+        break
+      }
+    }
+  }
+  // Cartes asiatiques : le code de l'extension est imprimé à côté du numéro (« sv8 », « SV4a ») et
+  // c'est exactement l'identifiant de l'extension. Très utile quand le total est mal lu.
+  let codeText = ''
+  if (asian && !byNumber.some((c) => readNumber && sameLocalId(c.localId, readNumber.raw))) {
+    // Le code est en blanc sur un petit cadre noir : on lit aussi en couleurs inversées.
+    for (const mode of ['contrast', 'inverted'] as const) {
+      codeText += (await readText(band(card, 0.9, 0.975, 0, 0.45, mode), onProgress, SET_CODE_CHARS)) + '\n'
+      const found = await findBySetCode(lang, codeText, [...numbers.map((n) => n.raw), ...looseNumbers(bottomText + '\n' + codeText)])
+      if (found.length) {
+        byNumber = found.map((f) => f.card)
+        readNumber = { num: parseInt(found[0].card.localId, 10) || 0, raw: found[0].card.localId, total: found[0].total, prefix: null }
+        break
+      }
+    }
+  }
+  // Mode automatique, aucune extension internationale ne correspond au numéro : c'est peut-être
+  // une carte japonaise (les plus courantes après les européennes). L'illustration départagera.
+  if (!byNumber.length && !asian) {
+    for (const n of numbers.slice(0, 2)) {
+      if (n.total === null || n.total < 10 || n.num > n.total * 1.6) continue
+      byNumber = await searchByNumber(n.raw, n.total, 0, 'ja').catch(() => [])
       if (byNumber.length) {
         readNumber = n
         break
@@ -199,10 +290,14 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
 
   // Recherche par nom : d'abord les noms de Pokémon reconnus (orthographe exacte),
   // sinon les premières lettres du texte lu (résiste aux erreurs de lecture).
+  // Nom lu dans une autre langue (« Glurak ») : on cherche avec le nom français et anglais.
+  const speciesFr = species.map((m) => speciesNames(m.name)?.fr ?? m.name)
   const queries = species.length
-    ? [...new Set(species.map((m) => m.name))].slice(0, 2)
+    ? [...new Set(speciesFr)].slice(0, 2)
     : [...new Set(names.map((n) => n.split(' ')[0]).filter((w) => w.length >= 3))].slice(0, 2).map((w) => w.slice(0, 6))
-  for (const q of queries) {
+  // Nom en un mot qui en fait deux dans la base (« Pokéball » → « Poké Ball ») : on cherche aussi le début du mot.
+  if (!species.length && names[0] && names[0].length >= 7 && !names[0].includes(' ')) queries.push(names[0].slice(0, 4))
+  for (const q of asian ? [] : queries) {
     const found = await searchByName(q)
     found.forEach((c) => pool.set(c.id, c))
   }
@@ -211,11 +306,16 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   // Petit avantage aux extensions récentes (les plus scannées) pour départager les égalités.
   const sets = await getSets('fr').catch(() => [])
   const recency = new Map(sets.map((s, i) => [s.id, i / Math.max(1, sets.length - 1)]))
+  // Position approximative d'une année dans la liste des extensions (1999 → début, cette année → fin).
+  const eraOf = (y: number) => Math.min(1, Math.max(0, (y - 1999) / Math.max(1, new Date().getFullYear() - 1999)))
   const candidates: Candidate[] = [...pool.values()].map((c) => {
     const nameScore = Math.max(
       0,
       ...names.map((n) => nameSimilarity(n, c.name)),
-      ...species.map((m) => m.score * nameSimilarity(m.name, c.name)),
+      ...species.map((m) => {
+        const t = speciesNames(m.name)
+        return m.score * Math.max(nameSimilarity(m.name, c.name), t ? Math.max(nameSimilarity(t.fr, c.name), nameSimilarity(t.en, c.name)) : 0)
+      }),
     )
     const fromNumberSearch = byNumber.some((b) => b.id === c.id)
     // Le numéro « colle » seulement si le total correspond aussi à l'extension
@@ -231,10 +331,13 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     const suffixBonus = suffix ? (cardSuffix === suffix ? 0.4 : !cardSuffix ? -0.2 : 0) : cardSuffix ? -0.15 : 0
     const cardMega = /^m[ée]ga[- ]/i.test(c.name)
     const megaBonus = mega && cardMega ? 0.5 : mega && !cardMega ? -0.3 : 0
-    const recent = (recency.get(setIdOf(c.id)) ?? 0) * 0.3
+    // Année du copyright lue : avantage aux extensions de cette époque (et non plus aux plus récentes).
+    const pos = recency.get(setIdOf(c.id)) ?? 0
+    const recent = (year ? 1 - Math.abs(pos - eraOf(year)) : pos) * 0.3
     // Le numéro compte d'autant plus que le nom concorde : un numéro mal lu ne doit pas
     // faire passer devant une carte au nom sans rapport (ex. « 143/117 » lu à la place de « 013/172 »).
-    const agree = 0.3 + 0.7 * nameScore
+    // Carte asiatique : pas de nom lisible, le numéro (avec l'illustration) fait foi.
+    const agree = splitCardId(c.id).lang ? 1 : 0.3 + 0.7 * nameScore
     const score =
       nameScore * 2.5 +
       (numberMatch ? 1.5 : looseMatch ? 0.4 : 0) * agree +
@@ -253,8 +356,14 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   // l'utilisateur choisira (ou tapera le numéro pour filtrer).
   const strict = candidates.some((c) => c.numberMatch)
   const limit = species.length && !strict ? 30 : 10
-  const best = candidates.filter((c) => c.score >= 1).slice(0, limit)
-  if (year) await compareYears(year, best)
+  // L'année du copyright départage d'abord une liste plus large : une extension récente pleine
+  // de Pikachu ne doit pas cacher le Pikachu de 1999 qu'on a en main.
+  let best = candidates.filter((c) => c.score >= 1).slice(0, 80)
+  if (year) {
+    await compareYears(year, best)
+    best.sort((a, b) => b.score - a.score)
+  }
+  best = best.slice(0, limit)
   await compareImages(card, best)
   best.sort((a, b) => b.score - a.score)
 
@@ -263,13 +372,18 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   const confident =
     !!first &&
     ((first.numberMatch && first.nameScore >= 0.7 && gap >= 0.5) ||
-      (first.nameScore >= 0.85 && (first.imageScore ?? 0) >= 0.85 && gap >= 1))
+      (first.nameScore >= 0.85 && (first.imageScore ?? 0) >= 0.85 && gap >= 1) ||
+      (first.nameScore >= 0.85 && (first.imageScore ?? 0) >= 0.88 && gap >= 0.5) ||
+      // Nom illisible (carte asiatique, nom dans une autre langue) : numéro exact + illustration identique.
+      (first.numberMatch && (first.imageScore ?? 0) >= 0.85 && gap >= 0.5))
 
   // Infos de diagnostic, consultables dans la console du navigateur (window.__pokecardScan).
   ;(globalThis as Record<string, unknown>).__pokecardScan = {
     cardPreview: card.toDataURL('image/jpeg', 0.7),
     topText,
     bottomText,
+    codeText,
+    viewLog,
     footer,
     year,
     names,

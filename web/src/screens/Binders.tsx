@@ -5,7 +5,7 @@ import { getSet, getSets, searchByName } from '../api/tcgdex'
 import type { CardBrief, SetBrief } from '../api/types'
 import { CardImage } from '../components/CardThumb'
 import { Card, ScreenTitle } from '../components/ui'
-import { CONDITIONS } from '../data/cardInfo'
+import { CONDITIONS, frLabel } from '../data/cardInfo'
 import { BINDER_COLORS, colsOf, compact, dropEmptyLastPage, padToPages, PAGE_FORMATS, pageCount, swap } from '../lib/binders'
 import {
   addToBinder,
@@ -43,7 +43,7 @@ function useOwnedRows() {
         prev.item = { ...prev.item, quantity: prev.item.quantity + i.quantity }
         prev.unit = Math.max(prev.unit, unit)
       } else {
-        byCard.set(i.cardId, { item: { ...i }, rarity: i.rarity ?? p?.rarity, types: i.types?.length ? i.types : (p?.types ?? []), unit })
+        byCard.set(i.cardId, { item: { ...i }, rarity: i.rarity ?? p?.rarity, types: (i.types?.length ? i.types : (p?.types ?? [])).map(frLabel), unit })
       }
     }
     return [...byCard.values()]

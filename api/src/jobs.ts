@@ -1,5 +1,6 @@
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
+import { cardPaths } from './lib/cardId.js'
 import { refreshPackStats } from './packs.js'
 import { type CardPricing, createTcgdexFetcher, mapLimit, recordSnapshot } from './routes/cards.js'
 
@@ -19,8 +20,11 @@ export async function snapshotPrices(db: Db, config: Config): Promise<number> {
   let done = 0
   await mapLimit(rows, 4, async ({ card_id }) => {
     // TTL court : on veut le prix du jour, pas une copie d'hier.
-    let res = await fetchTcgdex(`/v2/fr/cards/${encodeURIComponent(card_id)}`, 3_600_000)
-    if (res.status === 404) res = await fetchTcgdex(`/v2/en/cards/${encodeURIComponent(card_id)}`, 3_600_000)
+    let res = { status: 404, body: null as unknown }
+    for (const path of cardPaths(card_id)) {
+      res = await fetchTcgdex(path, 3_600_000)
+      if (res.status !== 404) break
+    }
     // Même si la fiche venait du cache, on enregistre le prix du jour.
     if (res.body) {
       await recordSnapshot(db, card_id, (res.body as { pricing?: CardPricing }).pricing)
