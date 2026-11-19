@@ -6,6 +6,7 @@ import { getCard, getSet, setIdOf } from '../api/tcgdex'
 import type { Card, SetDetail } from '../api/types'
 import { CardImage } from '../components/CardThumb'
 import { OwnedCopies } from '../components/OwnedCopies'
+import { AddToBinder } from './Binders'
 import { logFailedScan } from '../lib/scanLog'
 import { forgetScan, hasMyPhoto, recentScan, removeMyPhoto, saveMyPhotoFromDataUrl, saveMyPhotoFromFile } from '../lib/myPhotos'
 import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from '../components/ConditionCheck'
@@ -200,6 +201,9 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       </div>
 
       <OwnedCopies items={collection.filter((c) => c.cardId === card.id)} />
+      <div className="mt-3">
+        <AddToBinder card={{ cardId: card.id, name: card.name, image: card.image, setName: setInfo.name, localId: card.localId }} />
+      </div>
 
       {/* Rareté */}
       <Box>

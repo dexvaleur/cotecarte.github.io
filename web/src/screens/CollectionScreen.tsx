@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { getSets } from '../api/tcgdex'
 import type { SetBrief } from '../api/types'
 import { AccountPanel } from '../components/AccountPanel'
+import { BindersList } from './Binders'
 import { decrement } from '../components/OwnedCopies'
 import { CardImage } from '../components/CardThumb'
 import { PriceChart } from '../components/PriceChart'
@@ -17,7 +18,7 @@ import { load, save } from '../lib/storage'
 import { useCardPrices } from '../lib/useCardPrices'
 import { recordLocalValue, useValueHistory } from '../lib/valueHistory'
 
-type Tab = 'cards' | 'sets' | 'wish'
+type Tab = 'cards' | 'sets' | 'binders' | 'wish'
 const VALUE_BUCKETS = [
   { id: 'all', label: 'Toutes', min: 0, max: Infinity },
   { id: 'lt1', label: '< 1 €', min: 0, max: 1 },
@@ -33,7 +34,7 @@ function itemValue(item: CollectionItem, currentEur: number | null | undefined):
 }
 
 export function CollectionScreen() {
-  const { collection, wishlist } = useCollectionState()
+  const { collection, wishlist, binders } = useCollectionState()
   const session = useSession()
   const [tab, setTab] = useState<Tab>(() => load<Tab>('collectionTab', 'cards'))
   useEffect(() => save('collectionTab', tab), [tab])
@@ -50,7 +51,7 @@ export function CollectionScreen() {
     if (pricesReady && collection.length) recordLocalValue(total)
   }, [pricesReady, total, collection.length])
 
-  if (collection.length === 0 && wishlist.length === 0) return <Empty loggedIn={!!session} />
+  if (collection.length === 0 && wishlist.length === 0 && binders.length === 0) return <Empty loggedIn={!!session} />
 
   return (
     <>
@@ -63,11 +64,12 @@ export function CollectionScreen() {
         </Card>
       )}
 
-      <div role="tablist" className="mt-4 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1 text-sm font-semibold">
+      <div role="tablist" className="mt-4 grid grid-cols-4 gap-1 rounded-2xl bg-surface-2 p-1 text-xs font-semibold">
         {(
           [
             ['cards', `Cartes (${count})`],
             ['sets', 'Extensions'],
+            ['binders', `Classeurs${binders.length ? ` (${binders.length})` : ''}`],
             ['wish', `Wishlist (${wishlist.length})`],
           ] as const
         ).map(([id, label]) => (
@@ -86,6 +88,7 @@ export function CollectionScreen() {
       <div className="mt-4">
         {tab === 'cards' && <Cards items={collection} prices={prices} />}
         {tab === 'sets' && <SetsProgress items={collection} />}
+        {tab === 'binders' && <BindersList />}
         {tab === 'wish' && <Wishlist />}
       </div>
       {session && (

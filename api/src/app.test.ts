@@ -293,6 +293,43 @@ describe('cartes, cache et prix', () => {
   })
 })
 
+describe('classeurs', () => {
+  const binder = (over: Record<string, unknown> = {}) => ({
+    name: 'Mon classeur Feu',
+    color: '#e8572a',
+    perPage: 9,
+    slots: [{ cardId: 'sv03.5-006', name: 'Dracaufeu-ex', image: null }, null],
+    createdAt: '2026-11-19T10:00:00.000Z',
+    updatedAt: '2026-11-19T10:00:00.000Z',
+    ...over,
+  })
+  const id = '6f0c4a43-8c51-4a7a-9f43-1b3a8c0b2e11'
+
+  test('création, version plus récente, ancienne version ignorée, suppression', async () => {
+    const token = await login('classeur@example.com')
+    const auth = { authorization: `Bearer ${token}` }
+    const put = (body: unknown) => app.inject({ method: 'PUT', url: `/binders/${id}`, headers: auth, payload: body })
+    assert.equal((await put(binder())).statusCode, 200)
+    assert.equal((await put(binder({ name: 'Renommé', updatedAt: '2026-11-19T11:00:00.000Z' }))).statusCode, 200)
+    assert.equal((await put(binder({ name: 'Vieux', updatedAt: '2026-11-19T09:00:00.000Z' }))).statusCode, 200)
+    assert.equal((await put(binder({ perPage: 7 }))).statusCode, 400)
+
+    let data = (await app.inject({ method: 'GET', url: '/collection', headers: auth })).json()
+    assert.equal(data.binders.length, 1)
+    assert.equal(data.binders[0].name, 'Renommé')
+    assert.equal(data.binders[0].slots[1], null)
+
+    // Un autre compte ne peut pas écraser ce classeur.
+    const other = await login('pirate@example.com')
+    const stolen = await app.inject({ method: 'PUT', url: `/binders/${id}`, headers: { authorization: `Bearer ${other}` }, payload: binder({ updatedAt: '2027-01-01T00:00:00.000Z' }) })
+    assert.equal(stolen.statusCode, 409)
+
+    await app.inject({ method: 'DELETE', url: `/binders/${id}`, headers: auth })
+    data = (await app.inject({ method: 'GET', url: '/collection', headers: auth })).json()
+    assert.equal(data.binders.length, 0)
+  })
+})
+
 describe('statistiques de visite', () => {
   test('compteurs anonymes par jour, visibles par l’administrateur seulement', async () => {
     const hit = (events: unknown) => app.inject({ method: 'POST', url: '/stats/hit', payload: { events } })
