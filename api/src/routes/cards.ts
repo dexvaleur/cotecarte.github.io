@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Config } from '../config.js'
 import type { Db } from '../db/index.js'
+import { packStatsRunning, refreshPackStats, type SetStats } from '../packs.js'
 
 /**
  * Relais vers TCGdex, avec cache dans la base :
@@ -60,6 +61,20 @@ export async function cardRoutes(app: FastifyInstance, { db, config }: { db: Db;
     reply.header('Cache-Control', 'public, max-age=2592000, immutable')
     reply.header('Access-Control-Allow-Origin', '*')
     return reply.send(buf)
+  })
+
+  /** Onglet Packs : statistiques des extensions récentes (calculées une fois par jour). */
+  app.get('/packs', async (req) => {
+    const rows = await db.query<{ data: SetStats & { rank: number }; updated_at: Date }>('SELECT data, updated_at FROM pack_stats')
+    // Rien encore (premier lancement) ou données d'hier : on relance le calcul en arrière-plan.
+    const stale = !rows.length || rows.some((r) => Date.now() - new Date(r.updated_at).getTime() > 26 * HOUR)
+    if (stale && !packStatsRunning()) refreshPackStats(db, config, (m) => req.log.info(m)).catch((err) => req.log.error({ err }, 'packs'))
+    const sets = rows.map((r) => r.data).sort((a, b) => a.rank - b.rank)
+    const updatedAt = rows.reduce<string | null>((m, r) => {
+      const t = new Date(r.updated_at).toISOString()
+      return !m || t < m ? t : m
+    }, null)
+    return { sets, updatedAt, computing: packStatsRunning() }
   })
 
   /** Historique des prix d'une carte (une valeur par jour). */
