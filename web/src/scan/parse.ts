@@ -114,6 +114,31 @@ const STOP_WORDS = new Set(
   ].map(normalize),
 )
 
+// Mentions imprimées en haut des cartes Dresseur et Énergie (« DRESSEUR », « Supporter », « Objet »…).
+const MARKERS = ['dresseur', 'trainer', 'supporter', 'objet', 'item', 'stade', 'stadium', 'outil', 'tool', 'energie', 'energy']
+
+/**
+ * Mot qui ressemble à une de ces mentions, même mal lu : « DRESSE », « RESSE », « upporter », « mObjet ».
+ * Sans ce filtre, « RESSE » était pris pour le Pokémon Cresselia.
+ */
+export function isMarkerWord(word: string): boolean {
+  const w = normalize(word).replace(/ /g, '')
+  if (w.length < 4) return false
+  return MARKERS.some((m) => {
+    if (w === m) return true
+    if (m.length >= 6 && w.length >= 4 && m.includes(w)) return true // morceau : « resse », « upporter »
+    if (w.length > m.length && w.includes(m) && w.length - m.length <= 2) return true // « mobjet », « dresseurs »
+    return Math.abs(w.length - m.length) <= 2 && levenshtein(w, m) <= (m.length >= 7 ? 2 : 1)
+  })
+}
+
+/** Le haut de la carte indique une carte Dresseur (Supporter, Objet, Stade, Outil) ou Énergie. */
+export function isTrainerText(text: string): boolean {
+  return text
+    .split(/[^A-Za-zÀ-ÖØ-öø-ÿ]+/)
+    .some((w) => w.length >= 5 && isMarkerWord(w))
+}
+
 /** Lignes qui ne contiennent jamais le nom de la carte (« Évolution de : Reptincel »). */
 const SKIP_LINE = /(évolu|evolu|evolves|pokémon de base|basic pokémon|illus\.|faiblesse|weakness)/i
 
@@ -128,7 +153,7 @@ export function parseNameCandidates(text: string): string[] {
     const words = line
       .split(/[^A-Za-zÀ-ÖØ-öø-ÿ'’-]+/)
       .map((w) => w.replace(/^[-'’]+|[-'’]+$/g, ''))
-      .filter((w) => w.length >= 3 && !STOP_WORDS.has(normalize(w)))
+      .filter((w) => w.length >= 3 && !STOP_WORDS.has(normalize(w)) && !isMarkerWord(w))
       // Un mot avec trop peu de voyelles est souvent du « bruit » OCR.
       .filter((w) => /[aeiouyàâäéèêëîïôöùûü]/i.test(w))
     // Les noms sont parfois en deux mots (« Dracaufeu obscur », « Mr. Mime »).
@@ -188,12 +213,16 @@ function windowSimilarity(a: string, b: string): number {
  * On ignore les suffixes (« -ex », « V », « VMAX ») et le préfixe « Méga- » : ils sont gérés à part.
  */
 export function nameSimilarity(read: string, cardName: string): number {
-  const a = normalize(read).replace(/ /g, '')
-  const base = normalize(cardName.replace(/^m[ée]ga[- ]/i, '').replace(/[- ](ex|gx|v|vmax|vstar|v-union)$/i, '')).replace(/ /g, '')
+  // Les petits mots (« de », « du »…) sont écartés à la lecture : on les retire aussi du nom de la carte.
+  const squash = (s: string) => normalize(s).replace(LINK_WORDS, ' ').replace(/ /g, '')
+  const a = squash(read)
+  const base = squash(cardName.replace(/^m[ée]ga[- ]/i, '').replace(/[- ](ex|gx|v|vmax|vstar|v-union)$/i, ''))
   if (!a || !base) return 0
   if (a === base) return 1
   return windowSimilarity(a, base)
 }
+
+const LINK_WORDS = /\b(de|du|des|la|le|les|d|l|en|et|of|the)\b/g
 
 /** Suffixes lus de travers : le logo « ex » est souvent lu « es », « ez », « cx »… */
 // Le logo « ex » collé au nom est souvent lu « es », « e », « cx »… et le logo « V » « y », « w » ou « vy ».

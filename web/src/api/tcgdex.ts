@@ -94,12 +94,20 @@ function rethrowUnlessNotFound(err: unknown): CardBrief[] {
  * Recherche par numéro imprimé (ex. 6 et 165 pour « 006/165 »).
  * On cherche les extensions qui ont 165 cartes, puis la carte n°6 dans chacune.
  */
-export async function searchByNumber(raw: string, total: number | null): Promise<CardBrief[]> {
+export async function searchByNumber(raw: string, total: number | null, tolerance = 0): Promise<CardBrief[]> {
   if (total === null) return []
   const sets = await getSets('fr').catch(() => getSets('en'))
-  const matching = sets.filter((s) => s.cardCount.official === total || s.cardCount.total === total)
+  // tolerance : accepte un total lu à 1 ou 2 près (« 196 » lu au lieu de « 198 »).
+  const close = (n: number | undefined) => n !== undefined && Math.abs(n - total) <= tolerance
+  const diff = (s: SetBrief) => Math.min(Math.abs(s.cardCount.official - total), Math.abs(s.cardCount.total - total))
+  // Les plus proches du total lu d'abord, puis les plus récentes (la liste est dans l'ordre de sortie).
+  const matching = sets
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => close(s.cardCount.official) || close(s.cardCount.total))
+    .sort((a, b) => diff(a.s) - diff(b.s) || b.i - a.i)
+    .map(({ s }) => s)
   const results = await Promise.all(
-    matching.slice(0, 8).map(async (s) => {
+    matching.slice(0, 10).map(async (s) => {
       try {
         const { data } = await getSet(s.id)
         return data.cards.filter((c) => sameLocalId(c.localId, raw))

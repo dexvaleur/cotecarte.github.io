@@ -158,9 +158,32 @@ export function dHash(src: CanvasImageSource, width: number, height: number): Ui
   const sy = height * 0.1
   const sw = width * 0.84
   const sh = height * 0.4
+  // On réduit l'image petit à petit : réduite d'un coup en 9×8, le navigateur ne garde que quelques
+  // pixels pris presque au hasard, et deux photos de la même carte donnaient des empreintes différentes.
+  let cur: CanvasImageSource = src
+  let cx = sx
+  let cy = sy
+  let cw = sw
+  let ch = sh
+  while (cw > 36 || ch > 32) {
+    const nw = Math.max(9, Math.round(cw / 2))
+    const nh = Math.max(8, Math.round(ch / 2))
+    const step = makeCanvas(nw, nh)
+    const sctx = step.getContext('2d')!
+    sctx.imageSmoothingEnabled = true
+    sctx.imageSmoothingQuality = 'high'
+    sctx.drawImage(cur, cx, cy, cw, ch, 0, 0, nw, nh)
+    cur = step
+    cx = 0
+    cy = 0
+    cw = nw
+    ch = nh
+  }
   const c = makeCanvas(9, 8)
   const ctx = c.getContext('2d', { willReadFrequently: true })!
-  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, 9, 8)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(cur, cx, cy, cw, ch, 0, 0, 9, 8)
   const d = ctx.getImageData(0, 0, 9, 8).data
   const bits = new Uint8Array(64)
   for (let y = 0; y < 8; y++) {
