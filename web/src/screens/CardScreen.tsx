@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Check, Heart, Plus, RefreshCw, Tag, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Camera, Check, Heart, Plus, RefreshCw, ShoppingCart, Tag, TrendingDown, TrendingUp } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ApiError } from '../api/cache'
@@ -205,6 +205,14 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       <div className="mt-3">
         <AddToBinder card={{ cardId: card.id, name: card.name, image: card.image, setName: setInfo.name, localId: card.localId }} />
       </div>
+      <a
+        href={buyUrl(card, setInfo.name)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 flex items-center justify-center gap-2 rounded-2xl border border-line py-2.5 font-semibold"
+      >
+        <ShoppingCart size={18} /> Acheter cette carte sur Cardmarket
+      </a>
 
       {/* Rareté */}
       <Box>
@@ -342,6 +350,15 @@ function Change({ card }: { card: Card }) {
       {c.toFixed(0)} % sur 30 jours
     </p>
   )
+}
+
+/** Lien vers les offres Cardmarket : recherche par nom pour les cartes en lettres latines, fiche produit sinon. */
+function buyUrl(card: Card, setName?: string): string {
+  const id = card.pricing?.cardmarket?.idProduct
+  const latin = /^[\p{Script=Latin}\d\s'’.:\-♀♂é&]+$/u.test(card.name)
+  if (id && !latin) return `https://www.cardmarket.com/fr/Pokemon/Products?idProduct=${id}`
+  const q = latin ? card.name : `${card.name} ${setName ?? ''}`.trim()
+  return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(q)}`
 }
 
 function Prices({ card }: { card: Card }) {

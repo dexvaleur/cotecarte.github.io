@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { CardImage } from '../components/CardThumb'
@@ -185,9 +185,100 @@ export function PacksScreen() {
         </ul>
       </Card>
 
+      <WhereToBuy />
+
       <h2 className="mt-6 mb-2 text-lg font-extrabold">Extensions récentes</h2>
       <RecentSets />
     </>
+  )
+}
+
+const MAPS_SHOPS = 'https://www.google.com/maps/search/' + encodeURIComponent('boutique cartes Pokémon')
+const CARDMARKET = 'https://www.cardmarket.com/fr/Pokemon'
+
+const WHERE = [
+  {
+    id: 'shops',
+    label: '🏪 Boutiques spécialisées',
+    items: [
+      'Les magasins de jeux de cartes et de jeux de société : bons conseils, vrais produits, et souvent des tournois ou des ligues Pokémon pour échanger.',
+      'Beaucoup vendent aussi des cartes à l’unité et rachètent les tiennes.',
+    ],
+    link: { href: MAPS_SHOPS, text: 'Boutiques près de chez moi' },
+  },
+  {
+    id: 'stores',
+    label: '🛒 Grands magasins',
+    items: [
+      'Fnac, Cultura, King Jouet, JouéClub, Micromania, et le rayon jouets des supermarchés (Leclerc, Carrefour, Auchan…).',
+      'Pratique pour les boosters, tripacks et coffrets. Les nouveautés partent vite : passe le jour de la sortie.',
+      'En ligne, achète sur le site officiel du magasin, ou un produit « vendu et expédié par » le site lui-même.',
+    ],
+  },
+  {
+    id: 'single',
+    label: '🃏 Cartes à l’unité',
+    items: [
+      'Cardmarket : le grand site européen où des milliers de vendeurs (particuliers et boutiques) vendent leurs cartes. Ce sont les prix affichés dans l’appli.',
+      'Regarde l’état de la carte (NM = comme neuve), la note du vendeur et le pays (frais de port).',
+      'Sur la fiche d’une carte, le bouton « Acheter cette carte » ouvre directement ses offres.',
+    ],
+    link: { href: CARDMARKET, text: 'Ouvrir Cardmarket' },
+  },
+  {
+    id: 'used',
+    label: '🤝 Entre particuliers',
+    items: [
+      'Vinted, Leboncoin, brocantes, salons et conventions : on y fait de bonnes affaires…',
+      '… mais c’est là qu’on trouve le plus de fausses cartes et de boosters déjà ouverts puis recollés.',
+      'Pour une carte chère, demande des photos nettes recto-verso et paie par le système du site, jamais par virement direct.',
+    ],
+  },
+] as const
+
+function WhereToBuy() {
+  const [tab, setTab] = useState<(typeof WHERE)[number]['id']>('shops')
+  const w = WHERE.find((x) => x.id === tab)!
+  return (
+    <Card className="mt-4">
+      <h2 className="mb-3 font-bold">Où acheter ?</h2>
+      <div role="radiogroup" aria-label="Où acheter" className="flex flex-wrap gap-2">
+        {WHERE.map((x) => (
+          <button
+            key={x.id}
+            role="radio"
+            aria-checked={tab === x.id}
+            onClick={() => setTab(x.id)}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${tab === x.id ? 'bg-primary text-primary-ink' : 'bg-surface-2'}`}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+      <ul className="mt-3 list-disc space-y-1.5 pl-5">
+        {w.items.map((a) => (
+          <li key={a}>{a}</li>
+        ))}
+      </ul>
+      {'link' in w && (
+        <a
+          href={w.link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-line py-2.5 font-semibold"
+        >
+          {w.link.text} <ExternalLink size={16} />
+        </a>
+      )}
+      <div className="mt-4 rounded-2xl bg-warn/15 px-3 py-2 text-sm">
+        <p className="font-bold text-warn">⚠️ Attention aux faux</p>
+        <p>
+          Prix bien plus bas qu’ailleurs, emballage mal imprimé, carte trop brillante ou trop fine : méfie-toi. Un produit scellé neuf ne se vend
+          jamais à moitié prix.
+        </p>
+      </div>
+      <p className="mt-2 text-xs text-muted">Cote Carte n’est lié à aucun de ces magasins ou sites et ne touche aucune commission.</p>
+    </Card>
   )
 }
 
