@@ -30,12 +30,20 @@ export async function snapshotPrices(db: Db, config: Config): Promise<number> {
   return done
 }
 
+/** Données personnelles à durée limitée (RGPD) : codes de connexion et sessions expirées. */
+export async function purgeExpired(db: Db): Promise<void> {
+  await db.query(`DELETE FROM login_codes WHERE created_at < now() - interval '1 day'`)
+  await db.query(`DELETE FROM sessions WHERE expires_at < now()`)
+}
+
 /** Lance la tâche au démarrage puis toutes les 6 heures. */
 export function startJobs(db: Db, config: Config, log: (msg: string) => void): () => void {
   const run = () =>
     snapshotPrices(db, config)
       .then((n) => n && log(`💶 Prix du jour enregistrés pour ${n} carte(s)`))
       .catch((err) => log(`Tâche des prix en échec : ${(err as Error).message}`))
+      .then(() => purgeExpired(db))
+      .catch((err) => log(`Nettoyage en échec : ${(err as Error).message}`))
       .then(() => refreshPackStats(db, config, log))
       .catch((err) => log(`Statistiques des packs en échec : ${(err as Error).message}`))
   const first = setTimeout(run, 10_000)

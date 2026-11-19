@@ -2,6 +2,7 @@
 # Réglages à faire une fois sur GitHub :
 #   1. Settings → Pages → Source : « GitHub Actions »
 #   2. Settings → Secrets and variables → Actions → Variables : VITE_API_URL = adresse du serveur
+#      et VITE_CONTACT_EMAIL = email de contact affiché dans les mentions légales
 name: Mise en ligne de l'appli
 on:
   push:
@@ -36,6 +37,7 @@ jobs:
         working-directory: web
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_CONTACT_EMAIL: ${{ vars.VITE_CONTACT_EMAIL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

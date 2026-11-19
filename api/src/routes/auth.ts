@@ -57,8 +57,12 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
   })
 
   app.post('/auth/request', async (req, reply) => {
-    const parsed = z.object({ email: emailSchema }).safeParse(req.body)
+    const parsed = z.object({ email: emailSchema, consent: z.literal(true).optional() }).safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Adresse email invalide.' })
+    // Case obligatoire : 15 ans ou plus + conditions et politique de confidentialité acceptées.
+    if (!parsed.data.consent) {
+      return reply.code(400).send({ error: 'Coche la case « J’ai 15 ans ou plus… » pour créer ton compte.' })
+    }
     const { email } = parsed.data
     if (!isAllowed(email)) return reply.code(403).send({ error: PRIVATE_MESSAGE })
 
@@ -107,8 +111,8 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
 
     await db.query('UPDATE login_codes SET used_at = now() WHERE id = $1', [row.id])
     const [user] = await db.query<AuthUser>(
-      `INSERT INTO users (email) VALUES ($1)
-       ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+      `INSERT INTO users (email, terms_accepted_at) VALUES ($1, now())
+       ON CONFLICT (email) DO UPDATE SET terms_accepted_at = now()
        RETURNING id, email`,
       [email],
     )

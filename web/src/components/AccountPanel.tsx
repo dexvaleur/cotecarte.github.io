@@ -1,5 +1,6 @@
-import { CloudOff, LogOut, Mail, RefreshCw, Trash2 } from 'lucide-react'
+import { CloudOff, Download, LogOut, Mail, RefreshCw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { API_URL, deleteAccount, logout, requestCode, useSession, verifyCode } from '../lib/api'
 import { clearLocal, importLocalThenSync, syncNow, useCollectionState } from '../lib/collection'
 import { timeAgo } from '../lib/format'
@@ -10,7 +11,7 @@ import { timeAgo } from '../lib/format'
  */
 export function AccountPanel({ compact = false }: { compact?: boolean }) {
   const session = useSession()
-  const { sync, lastSync, syncError, outbox } = useCollectionState()
+  const { sync, lastSync, syncError, outbox, collection, wishlist } = useCollectionState()
 
   if (!API_URL) {
     if (compact) return null
@@ -68,6 +69,19 @@ export function AccountPanel({ compact = false }: { compact?: boolean }) {
         </button>
       </div>
       <button
+        onClick={() =>
+          downloadJson(`poke-card-mes-donnees-${new Date().toISOString().slice(0, 10)}.json`, {
+            exporte_le: new Date().toISOString(),
+            compte: { email: session.user.email },
+            collection,
+            wishlist,
+          })
+        }
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2.5 text-sm font-semibold"
+      >
+        <Download size={16} /> Télécharger mes données
+      </button>
+      <button
         onClick={async () => {
           if (!confirm('Supprimer ton compte et toute ta collection en ligne ? Cette action est définitive.')) return
           try {
@@ -85,9 +99,18 @@ export function AccountPanel({ compact = false }: { compact?: boolean }) {
   )
 }
 
+function downloadJson(name: string, data: unknown) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}
+
 function LoginForm({ compact }: { compact: boolean }) {
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [email, setEmail] = useState('')
+  const [consent, setConsent] = useState(false)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -95,10 +118,11 @@ function LoginForm({ compact }: { compact: boolean }) {
 
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault()
+    if (!consent) return setError('Coche la case pour continuer.')
     setBusy(true)
     setError(null)
     try {
-      const r = await requestCode(email)
+      const r = await requestCode(email, consent)
       setDevCode(r.devCode ?? null)
       setStep('code')
     } catch (err) {
@@ -150,6 +174,30 @@ function LoginForm({ compact }: { compact: boolean }) {
             {busy ? '…' : 'Recevoir'}
           </button>
         </form>
+      ) : null}
+      {step === 'email' ? (
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => {
+              setConsent(e.target.checked)
+              setError(null)
+            }}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+          />
+          <span>
+            J’ai 15 ans ou plus et j’accepte les{' '}
+            <Link to="/legal/cgu" className="font-semibold text-primary underline">
+              conditions
+            </Link>{' '}
+            et la{' '}
+            <Link to="/legal/confidentialite" className="font-semibold text-primary underline">
+              politique de confidentialité
+            </Link>
+            .
+          </span>
+        </label>
       ) : (
         <form onSubmit={checkCode} className="space-y-2">
           <div className="flex gap-2">
