@@ -4,6 +4,7 @@ import type { Config } from '../config.js'
 import type { Db } from '../db/index.js'
 import { fingerprint, newLoginCode, newSessionToken, sameFingerprint } from '../lib/crypto.js'
 import type { Mailer } from '../lib/mailer.js'
+import { adminSet } from './stats.js'
 
 /**
  * Connexion par email, sans mot de passe :
@@ -133,7 +134,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
   app.get('/me', async (req, reply) => {
     const user = requireUser(req)
     if (!user) return reply.code(401).send({ error: 'Non connecté.' })
-    return { user }
+    return { user, isAdmin: adminSet(config).has(user.email) }
   })
 
   // Suppression du compte et de toutes ses données (droit à l'effacement, RGPD).

@@ -92,6 +92,12 @@ export async function logout() {
   }
 }
 
+/** Vrai si l'utilisateur connecté est administrateur (accès aux statistiques). */
+export async function fetchIsAdmin(): Promise<boolean> {
+  const r = await api<{ isAdmin?: boolean }>('/me')
+  return !!r.isAdmin
+}
+
 export async function deleteAccount() {
   await api('/me', { method: 'DELETE' })
   setSession(null)

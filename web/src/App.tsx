@@ -14,6 +14,7 @@ import { PacksScreen } from './screens/PacksScreen'
 import { ScannerScreen } from './screens/ScannerScreen'
 import { SellScreen } from './screens/SellScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { StatsScreen } from './screens/StatsScreen'
 
 export default function App() {
   // Au premier lancement, on montre l'onboarding. Ensuite on s'en souvient.
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="vendre" element={<SellScreen />} />
         <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => setOnboarded(false)} />} />
         <Route path="glossaire" element={<GlossaryScreen />} />
+        <Route path="stats" element={<StatsScreen />} />
         <Route path="legal/:page?" element={<LegalScreen />} />
         <Route path="recherche" element={<SearchScreen />} />
         <Route path="carte/:id" element={<CardScreen />} />

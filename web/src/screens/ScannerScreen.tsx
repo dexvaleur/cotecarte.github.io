@@ -1,3 +1,4 @@
+import { trackScan } from '../lib/stats'
 import { Camera, ImageUp, RotateCcw, Search, Sparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -54,6 +55,7 @@ export function ScannerScreen() {
         const other = await recognizeCard(views, onProgress).catch(() => null)
         if (other) rec = mergeRecognitions(rec, other)
       }
+      trackScan()
       rememberScanPhoto(rec.preview, rec.confident ? rec.candidates[0]?.id : undefined, `${rec.readName ?? '?'} · ${rec.readNumber ? `${rec.readNumber.raw}/${rec.readNumber.total ?? '?'}` : '?'}`)
       if (rec.confident) {
         setPhase({ name: 'results', preview: rec.preview, rec })

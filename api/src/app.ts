@@ -7,6 +7,7 @@ import type { Mailer } from './lib/mailer.js'
 import { authRoutes } from './routes/auth.js'
 import { cardRoutes } from './routes/cards.js'
 import { collectionRoutes } from './routes/collection.js'
+import { statsRoutes } from './routes/stats.js'
 
 /**
  * Construit le serveur (sans le démarrer) : pratique pour les tests,
@@ -32,6 +33,7 @@ export async function buildApp({ db, config, mailer }: { db: Db; config: Config;
   await authRoutes(app, { db, config, mailer })
   await app.register(collectionRoutes, { db })
   await app.register(cardRoutes, { db, config })
+  await app.register(statsRoutes, { db, config })
 
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'erreur')

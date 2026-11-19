@@ -44,7 +44,12 @@ let config: ReturnType<typeof loadConfig>
 before(async () => {
   await new Promise<void>((r) => tcgdex.listen(0, '127.0.0.1', r))
   const port = (tcgdex.address() as AddressInfo).port
-  config = loadConfig({ NODE_ENV: 'test', TCGDEX_URL: `http://127.0.0.1:${port}`, AUTH_SECRET: 'secret-de-test-assez-long' })
+  config = loadConfig({
+    NODE_ENV: 'test',
+    TCGDEX_URL: `http://127.0.0.1:${port}`,
+    AUTH_SECRET: 'secret-de-test-assez-long',
+    ADMIN_EMAILS: 'Admin@Example.com',
+  })
   db = await createDb(undefined) // PGlite en mémoire
   await migrate(db)
   app = await buildApp({ db, config, mailer })
@@ -285,6 +290,36 @@ describe('cartes, cache et prix', () => {
     assert.ok(n >= 1)
     const rows = await db.query(`SELECT 1 FROM price_snapshots WHERE card_id = 'sv03.5-006' AND day = current_date`)
     assert.equal(rows.length, 1)
+  })
+})
+
+describe('statistiques de visite', () => {
+  test('compteurs anonymes par jour, visibles par l’administrateur seulement', async () => {
+    const hit = (events: unknown) => app.inject({ method: 'POST', url: '/stats/hit', payload: { events } })
+    assert.equal((await hit(['open', 'visitor', 'new'])).statusCode, 204)
+    assert.equal((await hit(['open', 'scan', 'scan'])).statusCode, 204)
+    assert.equal((await hit(['pirate'])).statusCode, 400)
+    assert.equal((await hit([])).statusCode, 400)
+
+    const anon = await app.inject({ method: 'GET', url: '/admin/stats' })
+    assert.equal(anon.statusCode, 401)
+    const user = await login('curieux@example.com')
+    const refused = await app.inject({ method: 'GET', url: '/admin/stats', headers: { authorization: `Bearer ${user}` } })
+    assert.equal(refused.statusCode, 403)
+    const me = await app.inject({ method: 'GET', url: '/me', headers: { authorization: `Bearer ${user}` } })
+    assert.equal(me.json().isAdmin, false)
+
+    const admin = await login('admin@example.com')
+    const meAdmin = await app.inject({ method: 'GET', url: '/me', headers: { authorization: `Bearer ${admin}` } })
+    assert.equal(meAdmin.json().isAdmin, true)
+    const r = await app.inject({ method: 'GET', url: '/admin/stats', headers: { authorization: `Bearer ${admin}` } })
+    assert.equal(r.statusCode, 200)
+    const { totals, days } = r.json()
+    assert.equal(days.length, 30)
+    assert.deepEqual({ open: days[0].open, visitor: days[0].visitor, new: days[0].new, scan: days[0].scan }, { open: 2, visitor: 1, new: 1, scan: 1 })
+    assert.ok(days[0].signups >= 2)
+    assert.ok(totals.users >= 2)
+    assert.equal(totals.visitors30, 1)
   })
 })
 

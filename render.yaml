@@ -28,3 +28,6 @@ services:
       # Accès privé : emails autorisés, séparés par des virgules (vide = ouvert à tous)
       - key: ALLOWED_EMAILS
         sync: false
+      # Emails autorisés à voir les statistiques (Réglages → Statistiques)
+      - key: ADMIN_EMAILS
+        sync: false
