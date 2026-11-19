@@ -50,7 +50,7 @@ function Welcome() {
   return (
     <div className="text-center">
       <img src="./favicon.svg" alt="" className="mx-auto mb-6 h-28 w-28 drop-shadow-xl" />
-      <h1 className="text-3xl font-extrabold tracking-tight">Bienvenue sur Poké Card</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight">Bienvenue sur Cote Carte</h1>
       <p className="mt-3 text-lg text-muted">
         Scanne une carte Pokémon et découvre tout de suite ce qu'elle est, sa rareté et combien elle vaut.
       </p>

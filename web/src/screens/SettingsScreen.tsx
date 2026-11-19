@@ -53,7 +53,7 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
       </Card>
 
       <p className="mt-6 text-center text-xs text-muted">
-        Poké Card · application de fan non officielle, non affiliée à Nintendo, Creatures, GAME FREAK ou The Pokémon
+        Cote Carte · application de fan non officielle, non affiliée à Nintendo, Creatures, GAME FREAK ou The Pokémon
         Company. Pokémon © Nintendo / Creatures / GAME FREAK.
       </p>
       <LegalLinks className="mt-2" />

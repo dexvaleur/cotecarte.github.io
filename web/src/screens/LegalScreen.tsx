@@ -74,7 +74,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
     <>
       <H>Éditeur</H>
       <p>
-        Poké Card est une application gratuite éditée par un particulier, à titre non professionnel et sans but
+        Cote Carte est une application gratuite éditée par un particulier, à titre non professionnel et sans but
         commercial. Conformément à l’article 6, III, 2 de la loi n° 2004-575 du 21 juin 2004 (LCEN), l’éditeur a choisi
         de rester anonyme ; ses coordonnées ont été communiquées à l’hébergeur.
       </p>
@@ -99,7 +99,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
 
       <H>Marques et images</H>
       <p>
-        Poké Card est une application de fan, <b>non officielle</b>. Elle n’est ni produite, ni approuvée, ni
+        Cote Carte est une application de fan, <b>non officielle</b>. Elle n’est ni produite, ni approuvée, ni
         sponsorisée par Nintendo, Creatures Inc., GAME FREAK inc. ou The Pokémon Company.
       </p>
       <p>
@@ -134,7 +134,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
 
       <H>Responsable du traitement</H>
       <p>
-        L’éditeur de Poké Card (voir Mentions légales). Contact : <Contact />
+        L’éditeur de Cote Carte (voir Mentions légales). Contact : <Contact />
       </p>
 
       <H>Ce qui reste sur ton téléphone</H>
@@ -228,7 +228,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
     <>
       <H>1. Le service</H>
       <p>
-        Poké Card aide à identifier ses cartes Pokémon, suivre sa collection et connaître leur valeur estimée. Il est
+        Cote Carte aide à identifier ses cartes Pokémon, suivre sa collection et connaître leur valeur estimée. Il est
         gratuit, sans publicité, et utilisable sans compte. Utiliser l’appli vaut acceptation de ces conditions.
       </p>
 
@@ -242,7 +242,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
       <p>
         Les prix affichés sont des <b>estimations</b> calculées à partir de moyennes publiques (Cardmarket). Ils
         changent tout le temps et peuvent être faux. La reconnaissance par le scanner peut aussi se tromper. Vérifie
-        toujours avant d’acheter, de vendre ou d’échanger une carte : Poké Card ne peut pas être tenu responsable d’une
+        toujours avant d’acheter, de vendre ou d’échanger une carte : Cote Carte ne peut pas être tenue responsable d’une
         décision prise à partir de ces informations.
       </p>
 

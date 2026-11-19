@@ -311,19 +311,19 @@ describe('accès privé', () => {
 
 test('mailer Brevo : envoie le code via l’API HTTPS', async () => {
   const { createMailer, parseFrom } = await import('./lib/mailer.js')
-  assert.deepEqual(parseFrom('Poké Card <moi@gmail.com>'), { name: 'Poké Card', email: 'moi@gmail.com' })
+  assert.deepEqual(parseFrom('Cote Carte <moi@gmail.com>'), { name: 'Cote Carte', email: 'moi@gmail.com' })
   assert.deepEqual(parseFrom('moi@gmail.com'), { email: 'moi@gmail.com' })
   const calls: { url: string; init: RequestInit }[] = []
   const fakeFetch = (async (url: string, init: RequestInit) => {
     calls.push({ url, init })
     return new Response('{}', { status: 201 })
   }) as unknown as typeof fetch
-  const config = { BREVO_API_KEY: 'cle', MAIL_FROM: 'Poké Card <moi@gmail.com>' } as never
+  const config = { BREVO_API_KEY: 'cle', MAIL_FROM: 'Cote Carte <moi@gmail.com>' } as never
   const mailer = await createMailer(config, () => {}, fakeFetch)
   await mailer.sendLoginCode('ami@gmail.com', '123456')
   assert.equal(calls[0].url, 'https://api.brevo.com/v3/smtp/email')
   const body = JSON.parse(String(calls[0].init.body))
-  assert.deepEqual(body.sender, { name: 'Poké Card', email: 'moi@gmail.com' })
+  assert.deepEqual(body.sender, { name: 'Cote Carte', email: 'moi@gmail.com' })
   assert.deepEqual(body.to, [{ email: 'ami@gmail.com' }])
   assert.match(body.subject, /123456/)
   const failing = await createMailer(config, () => {}, (async () => new Response('bad key', { status: 401 })) as unknown as typeof fetch)

@@ -41,7 +41,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
       .filter(Boolean),
   )
   const isAllowed = (email: string) => allowed.size === 0 || allowed.has(email)
-  const PRIVATE_MESSAGE = 'Poké Card est en accès privé pour le moment. Tu peux quand même scanner tes cartes sans compte.'
+  const PRIVATE_MESSAGE = 'Cote Carte est en accès privé pour le moment. Tu peux quand même scanner tes cartes sans compte.'
 
   // Pour chaque requête : si un jeton valide est fourni, on sait qui est l'utilisateur.
   app.decorateRequest('user', null)

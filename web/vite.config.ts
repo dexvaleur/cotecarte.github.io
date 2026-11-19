@@ -15,8 +15,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Poké Card',
-        short_name: 'Poké Card',
+        name: 'Cote Carte',
+        short_name: 'Cote Carte',
         description: 'Scanne tes cartes Pokémon, découvre leur valeur et gère ta collection.',
         lang: 'fr',
         start_url: './',

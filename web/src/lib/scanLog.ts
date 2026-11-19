@@ -80,7 +80,7 @@ export async function failedScanFiles(): Promise<File[]> {
 export async function shareFailedScans(): Promise<'shared' | 'downloaded'> {
   const files = await failedScanFiles()
   if (navigator.canShare?.({ files })) {
-    await navigator.share({ files, title: 'Scans ratés Poké Card' })
+    await navigator.share({ files, title: 'Scans ratés Cote Carte' })
     return 'shared'
   }
   for (const f of files) {

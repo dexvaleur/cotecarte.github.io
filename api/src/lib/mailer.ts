@@ -7,13 +7,13 @@ export interface Mailer {
   readonly console: boolean
 }
 
-const subject = (code: string) => `${code} est ton code Poké Card`
+const subject = (code: string) => `${code} est ton code Cote Carte`
 const text = (code: string) =>
-  `Bonjour !\n\nVoici ton code de connexion à Poké Card : ${code}\n\nIl est valable 15 minutes. Si tu n'as rien demandé, ignore simplement cet email.\n`
+  `Bonjour !\n\nVoici ton code de connexion à Cote Carte : ${code}\n\nIl est valable 15 minutes. Si tu n'as rien demandé, ignore simplement cet email.\n`
 const html = (code: string) =>
-  `<p>Bonjour !</p><p>Voici ton code de connexion à <b>Poké Card</b> :</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Il est valable 15 minutes. Si tu n'as rien demandé, ignore simplement cet email.</p>`
+  `<p>Bonjour !</p><p>Voici ton code de connexion à <b>Cote Carte</b> :</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>Il est valable 15 minutes. Si tu n'as rien demandé, ignore simplement cet email.</p>`
 
-/** « Poké Card <moi@gmail.com> » → { name, email } */
+/** « Cote Carte <moi@gmail.com> » → { name, email } */
 export function parseFrom(from: string): { name?: string; email: string } {
   const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(from)
   return m ? { name: m[1] || undefined, email: m[2].trim() } : { email: from.trim() }
