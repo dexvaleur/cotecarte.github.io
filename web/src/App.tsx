@@ -7,6 +7,7 @@ import { SetScreen } from './screens/SetScreen'
 import { load, save } from './lib/storage'
 import { CollectionScreen } from './screens/CollectionScreen'
 import { GlossaryScreen } from './screens/GlossaryScreen'
+import { LegalScreen } from './screens/LegalScreen'
 import { NewsScreen } from './screens/NewsScreen'
 import { Onboarding } from './screens/Onboarding'
 import { PacksScreen } from './screens/PacksScreen'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="vendre" element={<SellScreen />} />
         <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => setOnboarded(false)} />} />
         <Route path="glossaire" element={<GlossaryScreen />} />
+        <Route path="legal/:page?" element={<LegalScreen />} />
         <Route path="recherche" element={<SearchScreen />} />
         <Route path="carte/:id" element={<CardScreen />} />
         <Route path="collection/extension/:setId" element={<SetScreen />} />

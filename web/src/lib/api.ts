@@ -74,8 +74,8 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 
 // ---- Connexion par code ----------------------------------------------------
 
-export async function requestCode(email: string): Promise<{ devCode?: string }> {
-  return api('/auth/request', { method: 'POST', body: { email } })
+export async function requestCode(email: string, consent: boolean): Promise<{ devCode?: string }> {
+  return api('/auth/request', { method: 'POST', body: { email, consent } })
 }
 
 export async function verifyCode(email: string, code: string): Promise<Session> {

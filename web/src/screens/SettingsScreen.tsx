@@ -2,6 +2,7 @@ import { Monitor, Moon, RotateCcw, Share2, Sun, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { AccountPanel } from '../components/AccountPanel'
 import { Card, ScreenTitle } from '../components/ui'
+import { LegalLinks } from './LegalScreen'
 import { clearFailedScans, shareFailedScans, useFailedScans } from '../lib/scanLog'
 import { type ThemeChoice, useTheme } from '../lib/theme'
 
@@ -52,8 +53,10 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
       </Card>
 
       <p className="mt-6 text-center text-xs text-muted">
-        Poké Card · application non officielle, non affiliée à The Pokémon Company ou Nintendo.
+        Cote Carte · application de fan non officielle, non affiliée à Nintendo, Creatures, GAME FREAK ou The Pokémon
+        Company. Pokémon © Nintendo / Creatures / GAME FREAK.
       </p>
+      <LegalLinks className="mt-2" />
     </>
   )
 }

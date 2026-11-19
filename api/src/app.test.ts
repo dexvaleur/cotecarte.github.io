@@ -57,7 +57,7 @@ after(async () => {
 })
 
 async function login(email: string): Promise<string> {
-  const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email } })
+  const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email, consent: true } })
   assert.equal(r.statusCode, 200)
   const code = r.json().devCode as string
   const v = await app.inject({ method: 'POST', url: '/auth/verify', payload: { email, code } })
@@ -81,7 +81,7 @@ const item = (over: Record<string, unknown> = {}) => ({
 
 describe('connexion par email', () => {
   test('code envoyé, mauvais code refusé, bon code accepté', async () => {
-    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email: '  Sacha@Example.com ' } })
+    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email: '  Sacha@Example.com ', consent: true } })
     assert.equal(r.statusCode, 200)
     assert.match(r.json().devCode, /^\d{6}$/)
     const code = r.json().devCode as string
@@ -104,13 +104,19 @@ describe('connexion par email', () => {
   })
 
   test('email invalide refusé', async () => {
-    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email: 'pas-un-email' } })
+    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email: 'pas-un-email', consent: true } })
     assert.equal(r.statusCode, 400)
+  })
+
+  test('case 15 ans / conditions obligatoire', async () => {
+    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email: 'jeune@example.com' } })
+    assert.equal(r.statusCode, 400)
+    assert.match(r.json().error, /15 ans/)
   })
 
   test('5 essais maximum par code', async () => {
     const email = 'essais@example.com'
-    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email } })
+    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email, consent: true } })
     const code = r.json().devCode as string
     const wrong = code === '123456' ? '654321' : '123456'
     for (let i = 0; i < 5; i++) await app.inject({ method: 'POST', url: '/auth/verify', payload: { email, code: wrong } })
@@ -120,8 +126,8 @@ describe('connexion par email', () => {
 
   test('5 codes maximum par heure', async () => {
     const email = 'rafale@example.com'
-    for (let i = 0; i < 5; i++) await app.inject({ method: 'POST', url: '/auth/request', payload: { email } })
-    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email } })
+    for (let i = 0; i < 5; i++) await app.inject({ method: 'POST', url: '/auth/request', payload: { email, consent: true } })
+    const r = await app.inject({ method: 'POST', url: '/auth/request', payload: { email, consent: true } })
     assert.equal(r.statusCode, 429)
   })
 
@@ -291,10 +297,10 @@ describe('accès privé', () => {
       config: loadConfig({ NODE_ENV: 'test', AUTH_SECRET: 'secret-de-test-assez-long', ALLOWED_EMAILS: ' Moi@Example.com , ami@example.com' }),
       mailer,
     })
-    const refused = await app2.inject({ method: 'POST', url: '/auth/request', payload: { email: 'inconnu@example.com' } })
+    const refused = await app2.inject({ method: 'POST', url: '/auth/request', payload: { email: 'inconnu@example.com', consent: true } })
     assert.equal(refused.statusCode, 403)
     assert.match(refused.json().error, /accès privé/)
-    const ok = await app2.inject({ method: 'POST', url: '/auth/request', payload: { email: 'moi@example.com' } })
+    const ok = await app2.inject({ method: 'POST', url: '/auth/request', payload: { email: 'moi@example.com', consent: true } })
     assert.equal(ok.statusCode, 200)
     const v = await app2.inject({ method: 'POST', url: '/auth/verify', payload: { email: 'moi@example.com', code: ok.json().devCode } })
     assert.equal(v.statusCode, 200)
@@ -305,19 +311,19 @@ describe('accès privé', () => {
 
 test('mailer Brevo : envoie le code via l’API HTTPS', async () => {
   const { createMailer, parseFrom } = await import('./lib/mailer.js')
-  assert.deepEqual(parseFrom('Poké Card <moi@gmail.com>'), { name: 'Poké Card', email: 'moi@gmail.com' })
+  assert.deepEqual(parseFrom('Cote Carte <moi@gmail.com>'), { name: 'Cote Carte', email: 'moi@gmail.com' })
   assert.deepEqual(parseFrom('moi@gmail.com'), { email: 'moi@gmail.com' })
   const calls: { url: string; init: RequestInit }[] = []
   const fakeFetch = (async (url: string, init: RequestInit) => {
     calls.push({ url, init })
     return new Response('{}', { status: 201 })
   }) as unknown as typeof fetch
-  const config = { BREVO_API_KEY: 'cle', MAIL_FROM: 'Poké Card <moi@gmail.com>' } as never
+  const config = { BREVO_API_KEY: 'cle', MAIL_FROM: 'Cote Carte <moi@gmail.com>' } as never
   const mailer = await createMailer(config, () => {}, fakeFetch)
   await mailer.sendLoginCode('ami@gmail.com', '123456')
   assert.equal(calls[0].url, 'https://api.brevo.com/v3/smtp/email')
   const body = JSON.parse(String(calls[0].init.body))
-  assert.deepEqual(body.sender, { name: 'Poké Card', email: 'moi@gmail.com' })
+  assert.deepEqual(body.sender, { name: 'Cote Carte', email: 'moi@gmail.com' })
   assert.deepEqual(body.to, [{ email: 'ami@gmail.com' }])
   assert.match(body.subject, /123456/)
   const failing = await createMailer(config, () => {}, (async () => new Response('bad key', { status: 401 })) as unknown as typeof fetch)

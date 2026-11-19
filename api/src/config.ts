@@ -25,7 +25,7 @@ const schema = z.object({
   SMTP_URL: z.string().optional(),
   /** Clé API Brevo (envoi par HTTPS, prioritaire sur SMTP_URL). Utile si l'hébergeur bloque le SMTP. */
   BREVO_API_KEY: z.string().optional(),
-  MAIL_FROM: z.string().default('Poké Card <no-reply@pokecard.local>'),
+  MAIL_FROM: z.string().default('Cote Carte <no-reply@cotecarte.local>'),
   /** Adresse de TCGdex (modifiable pour les tests). */
   TCGDEX_URL: z.string().default('https://api.tcgdex.net'),
 })
