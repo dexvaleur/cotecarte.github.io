@@ -24,6 +24,13 @@ export interface StarCard {
   eur: number
 }
 
+/** Carte dont le prix a beaucoup bougé (moyenne 7 jours comparée à la moyenne 30 jours). */
+export interface Mover extends StarCard {
+  setName: string
+  /** Variation en %, ex. 35 pour +35 % */
+  change: number
+}
+
 export interface SetStats {
   id: string
   name: string
@@ -42,7 +49,12 @@ export interface SetStats {
   secretCount: number
   /** Somme des prix de toutes les cartes (1 exemplaire de chaque) */
   fullSetEur: number
+  /** Plus fortes hausses et baisses de la semaine (cartes à 5 € ou plus) */
+  movers?: Mover[]
 }
+
+/** Prix minimum pour qu'une variation soit intéressante (sinon : 0,10 € → 0,20 € = +100 %). */
+const MOVER_MIN_EUR = 5
 
 interface SetDetail {
   id: string
@@ -98,7 +110,25 @@ export function computeSetStats(set: SetDetail, cards: CardDetail[]): SetStats {
     secretAvg: secrets.length ? round(secrets.reduce((s, x) => s + x.eur, 0) / secrets.length) : null,
     secretCount: secrets.length,
     fullSetEur: round(priced.reduce((s, x) => s + x.eur, 0)),
+    movers: movers(set, priced),
   }
+}
+
+function movers(set: SetDetail, priced: { c: CardDetail; eur: number }[]): Mover[] {
+  const all = priced
+    .map(({ c, eur }): Mover | null => {
+      const cm = c.pricing?.cardmarket
+      const a7 = cm?.avg7
+      const a30 = cm?.avg30
+      if (!a7 || !a30 || a7 < MOVER_MIN_EUR || a30 < MOVER_MIN_EUR) return null
+      const change = Math.round(((a7 - a30) / a30) * 100)
+      return { id: c.id, name: c.name, localId: c.localId, image: c.image, rarity: c.rarity, eur: round(eur), setName: set.name, change }
+    })
+    .filter((m): m is Mover => m !== null && Math.abs(m.change) >= 10)
+    .sort((a, b) => b.change - a.change)
+  const ups = all.filter((m) => m.change > 0).slice(0, 5)
+  const downs = all.filter((m) => m.change < 0).slice(-5)
+  return [...ups, ...downs]
 }
 
 /** Extensions principales récentes déjà sorties (hors promos et mini-collections). */

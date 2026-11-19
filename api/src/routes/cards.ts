@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Config } from '../config.js'
 import type { Db } from '../db/index.js'
+import { buildNews } from '../news.js'
 import { packStatsRunning, refreshPackStats, type SetStats } from '../packs.js'
 
 /**
@@ -19,7 +20,7 @@ const HOUR = 3600_000
 const ALLOWED_PATH = /^\/v2\/(fr|en)\/(cards|sets|series)(\/[\w.\-%]+)?$/
 
 export interface CardPricing {
-  cardmarket?: { trend?: number | null; avg?: number | null; low?: number | null; avg30?: number | null } | null
+  cardmarket?: { trend?: number | null; avg?: number | null; low?: number | null; avg7?: number | null; avg30?: number | null } | null
   tcgplayer?: Record<string, unknown> | null
 }
 
@@ -76,6 +77,9 @@ export async function cardRoutes(app: FastifyInstance, { db, config }: { db: Db;
     }, null)
     return { sets, updatedAt, computing: packStatsRunning() }
   })
+
+  /** Onglet Actus : sorties, prix qui bougent, articles. */
+  app.get('/news', async () => buildNews(db))
 
   /** Historique des prix d'une carte (une valeur par jour). */
   app.get<{ Params: { cardId: string }; Querystring: { days?: string } }>('/prices/:cardId/history', async (req) => {

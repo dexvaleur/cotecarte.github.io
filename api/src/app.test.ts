@@ -350,3 +350,31 @@ test('packs : liste vide au premier lancement, sans erreur', async () => {
   assert.equal(r.statusCode, 200)
   assert.deepEqual(r.json().sets, [])
 })
+
+test('actus : lecture du flux RSS et tri des articles « cartes »', async () => {
+  const { parseRss, isCardNews } = await import('./news.js')
+  const xml = `<rss><channel>
+    <item><title><![CDATA[Nouvelle extension JCC : Règne Delta]]></title><link>https://www.pokebip.com/a</link>
+      <pubDate>Thu, 12 Nov 2026 10:00:00 +0100</pubDate><description>&lt;p&gt;Les boosters arrivent &amp;amp; plus&lt;/p&gt;</description>
+      <enclosure url="https://www.pokebip.com/a.jpg" type="image/jpeg"/></item>
+    <item><title>Pokémon Pocket : nouveau booster promo</title><link>https://www.pokebip.com/b</link><pubDate>Thu, 12 Nov 2026 09:00:00 +0100</pubDate></item>
+    <item><title>Pokémon GO : Journée de Raids</title><link>https://www.pokebip.com/c</link></item>
+    <item><title>Lien douteux</title><link>javascript:alert(1)</link></item>
+  </channel></rss>`
+  const items = parseRss(xml, 'Pokébip')
+  assert.equal(items.length, 3)
+  assert.equal(items[0].title, 'Nouvelle extension JCC : Règne Delta')
+  assert.equal(items[0].image, 'https://www.pokebip.com/a.jpg')
+  assert.equal(items[0].date, '2026-11-12T09:00:00.000Z')
+  assert.deepEqual(items.filter(isCardNews).map((a) => a.link), ['https://www.pokebip.com/a'])
+})
+
+test('actus : réponse sans données ni réseau', async () => {
+  const { buildNews, resetNewsCache } = await import('./news.js')
+  resetNewsCache()
+  const offline = (async () => {
+    throw new Error('hors ligne')
+  }) as unknown as typeof fetch
+  const n = await buildNews(db, offline)
+  assert.deepEqual(n, { releases: [], up: [], down: [], articles: [] })
+})
