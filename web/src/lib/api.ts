@@ -56,8 +56,11 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
         ...(session ? { authorization: `Bearer ${session.token}` } : {}),
       },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      // Le serveur gratuit peut mettre ~1 min à se réveiller : au-delà de 90 s, on abandonne.
+      signal: AbortSignal.timeout(90_000),
     })
-  } catch {
+  } catch (e) {
+    if ((e as Error)?.name === 'TimeoutError') throw new ApiRequestError(0, 'Le serveur met trop de temps à répondre. Réessaie dans une minute.')
     throw new ApiRequestError(0, navigator.onLine ? 'Le serveur ne répond pas.' : 'Pas de connexion internet.')
   }
   const data = (await res.json().catch(() => ({}))) as T & { error?: string }
