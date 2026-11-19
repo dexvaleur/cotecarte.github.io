@@ -12,7 +12,8 @@ import { forgetScan, hasMyPhoto, recentScan, removeMyPhoto, saveMyPhotoFromDataU
 import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from '../components/ConditionCheck'
 import { PriceChart } from '../components/PriceChart'
 import { Card as Box } from '../components/ui'
-import { CONDITIONS, generationOf, rarityInfo, typeColor } from '../data/cardInfo'
+import { CONDITIONS, frLabel, generationOf, rarityInfo, typeColor } from '../data/cardInfo'
+import { LANG_NAMES } from '../api/cardId'
 import { addToCollection, toggleWish, useCollectionState } from '../lib/collection'
 import { formatDate, formatEur, formatEurCompact, formatUsd, timeAgo } from '../lib/format'
 import { cardmarketRows, change30d, chartPoints, type PriceRow, refPriceEur, tcgplayerRows } from '../lib/prices'
@@ -179,9 +180,9 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl leading-tight font-extrabold tracking-tight">{card.name}</h1>
           <p className="text-sm text-muted">
-            {card.category}
-            {card.stage ? ` · ${card.stage}` : ''}
-            {card.lang === 'en' && ' · fiche en anglais'}
+            {card.category && frLabel(card.category)}
+            {card.stage ? ` · ${frLabel(card.stage)}` : ''}
+            {card.lang !== 'fr' && ` · fiche en ${LANG_NAMES[card.lang] ?? card.lang}`}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {card.types?.map((t) => <TypeChip key={t} type={t} />)}
@@ -428,7 +429,7 @@ function PriceTable({ title, rows, fmt, updated }: { title: string; rows: PriceR
 function TypeChip({ type }: { type: string }) {
   return (
     <span className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white" style={{ background: typeColor(type) }}>
-      {type}
+      {frLabel(type)}
     </span>
   )
 }

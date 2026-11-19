@@ -93,3 +93,16 @@ export const CONDITIONS: Record<ConditionCode, { label: string; short: string; f
   PL: { label: 'Played', short: 'PL', factor: 0.35, explain: 'Usure importante, petit pli possible.' },
   PO: { label: 'Poor', short: 'PO', factor: 0.2, explain: 'Très abîmée : pli marqué, déchirure, tache.' },
 }
+
+// Fiches japonaises, coréennes… : TCGdex donne le type, la catégorie et le stade en anglais.
+const EN_TO_FR: Record<string, string> = {
+  grass: 'Plante', fire: 'Feu', water: 'Eau', lightning: 'Électrique', psychic: 'Psy', fighting: 'Combat',
+  darkness: 'Obscurité', metal: 'Métal', fairy: 'Fée', dragon: 'Dragon', colorless: 'Incolore',
+  pokemon: 'Pokémon', trainer: 'Dresseur', energy: 'Énergie',
+  basic: 'De base', stage1: 'Niveau 1', stage2: 'Niveau 2', vmax: 'VMAX', vstar: 'VSTAR', mega: 'Méga',
+}
+
+/** « Fire » → « Feu », « Stage2 » → « Niveau 2 » ; un mot déjà en français reste tel quel. */
+export function frLabel(word: string): string {
+  return EN_TO_FR[word.toLowerCase().replace(/\s+/g, '')] ?? word
+}

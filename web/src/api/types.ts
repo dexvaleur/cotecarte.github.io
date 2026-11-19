@@ -1,6 +1,8 @@
 // Formes des données renvoyées par l'API TCGdex (seulement les champs utilisés).
 
-export type Lang = 'fr' | 'en'
+import type { AsianLang } from './cardId'
+
+export type Lang = 'fr' | 'en' | AsianLang
 
 export interface CardBrief {
   id: string

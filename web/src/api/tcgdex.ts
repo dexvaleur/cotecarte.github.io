@@ -2,6 +2,7 @@ import { ApiError, cachedJson, DAY, HOUR } from './cache'
 import type { Cached, Card, CardBrief, Lang, SetBrief, SetDetail } from './types'
 import { sameLocalId } from '../scan/parse'
 import { API_URL } from '../lib/api'
+import { splitCardId, withLang } from './cardId'
 
 /**
  * Accès à TCGdex (https://tcgdex.dev) : base de données gratuite des cartes Pokémon,
@@ -39,16 +40,29 @@ async function pocketSetIds(): Promise<Set<string>> {
 }
 
 export async function getSets(lang: Lang = 'fr'): Promise<SetBrief[]> {
+  if (lang !== 'fr' && lang !== 'en') {
+    // Extensions asiatiques : identifiants préfixés par la langue (« ja:SV2a »).
+    const { data } = await get<SetBrief[]>(`/${lang}/sets`, DAY)
+    return data.map((s) => ({ ...s, id: withLang(lang, s.id) }))
+  }
   const [{ data }, pocket] = await Promise.all([get<SetBrief[]>(`/${lang}/sets`, DAY), pocketSetIds()])
   return data.filter((s) => !pocket.has(s.id))
 }
 
 export async function getSet(id: string, lang: Lang = 'fr'): Promise<Cached<SetDetail>> {
-  return get<SetDetail>(`/${lang}/sets/${encodeURIComponent(id)}`, DAY)
+  const { lang: asian, raw } = splitCardId(id)
+  if (!asian) return get<SetDetail>(`/${lang}/sets/${encodeURIComponent(id)}`, DAY)
+  const res = await get<SetDetail>(`/${asian}/sets/${encodeURIComponent(raw)}`, DAY)
+  return { ...res, data: { ...res.data, id, cards: res.data.cards.map((c) => ({ ...c, id: withLang(asian, c.id) })) } }
 }
 
 /** Fiche complète d'une carte : en français si elle existe, sinon en anglais. */
 export async function getCard(id: string): Promise<Cached<Card>> {
+  const { lang: asian, raw } = splitCardId(id)
+  if (asian) {
+    const res = await get<Omit<Card, 'lang'>>(`/${asian}/cards/${encodeURIComponent(raw)}`, 6 * HOUR)
+    return { ...res, data: { ...res.data, id, lang: asian } }
+  }
   try {
     const res = await get<Omit<Card, 'lang'>>(`/fr/cards/${encodeURIComponent(id)}`, 6 * HOUR)
     return { ...res, data: { ...res.data, lang: 'fr' } }
@@ -94,9 +108,9 @@ function rethrowUnlessNotFound(err: unknown): CardBrief[] {
  * Recherche par numéro imprimé (ex. 6 et 165 pour « 006/165 »).
  * On cherche les extensions qui ont 165 cartes, puis la carte n°6 dans chacune.
  */
-export async function searchByNumber(raw: string, total: number | null, tolerance = 0): Promise<CardBrief[]> {
+export async function searchByNumber(raw: string, total: number | null, tolerance = 0, lang: Lang = 'fr'): Promise<CardBrief[]> {
   if (total === null) return []
-  const sets = await getSets('fr').catch(() => getSets('en'))
+  const sets = lang === 'fr' ? await getSets('fr').catch(() => getSets('en')) : await getSets(lang)
   // tolerance : accepte un total lu à 1 ou 2 près (« 196 » lu au lieu de « 198 »).
   const close = (n: number | undefined) => n !== undefined && Math.abs(n - total) <= tolerance
   const diff = (s: SetBrief) => Math.min(Math.abs(s.cardCount.official - total), Math.abs(s.cardCount.total - total))
@@ -109,7 +123,7 @@ export async function searchByNumber(raw: string, total: number | null, toleranc
   const results = await Promise.all(
     matching.slice(0, 10).map(async (s) => {
       try {
-        const { data } = await getSet(s.id)
+        const { data } = await getSet(s.id, lang === 'en' ? 'en' : 'fr')
         return data.cards.filter((c) => sameLocalId(c.localId, raw))
       } catch {
         return []

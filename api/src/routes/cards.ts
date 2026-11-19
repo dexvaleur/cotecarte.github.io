@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { cardPaths } from '../lib/cardId.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db/index.js'
 import { buildNews } from '../news.js'
@@ -17,7 +18,7 @@ import { packStatsRunning, refreshPackStats, type SetStats } from '../packs.js'
 
 const HOUR = 3600_000
 // Chemins autorisés : uniquement la lecture des cartes, extensions et séries.
-const ALLOWED_PATH = /^\/v2\/(fr|en)\/(cards|sets|series)(\/[\w.\-%]+)?$/
+const ALLOWED_PATH = /^\/v2\/(fr|en|ja|ko|zh-tw|zh-cn|th|id)\/(cards|sets|series)(\/[\w.\-%]+)?$/
 
 export interface CardPricing {
   cardmarket?: { trend?: number | null; avg?: number | null; low?: number | null; avg7?: number | null; avg30?: number | null } | null
@@ -99,10 +100,12 @@ export async function cardRoutes(app: FastifyInstance, { db, config }: { db: Db;
     const ids = [...new Set(body.data.ids)]
     const out: Record<string, { eur: number | null; rarity?: string; types?: string[] }> = {}
     await mapLimit(ids, 6, async (id) => {
-      const res = await fetchTcgdex(`/v2/fr/cards/${encodeURIComponent(id)}`, 6 * HOUR)
-      const card = (res.body ?? (await fetchTcgdex(`/v2/en/cards/${encodeURIComponent(id)}`, 6 * HOUR)).body) as
-        | { pricing?: CardPricing; rarity?: string; types?: string[] }
-        | null
+      type Body = { pricing?: CardPricing; rarity?: string; types?: string[] }
+      let card: Body | null = null
+      for (const path of cardPaths(id)) {
+        card = (await fetchTcgdex(path, 6 * HOUR)).body as Body | null
+        if (card) break
+      }
       if (!card) return
       const cm = card.pricing?.cardmarket
       out[id] = { eur: firstPositive(cm?.trend, cm?.avg, cm?.avg30), rarity: card.rarity, types: card.types }
@@ -129,8 +132,13 @@ export function createTcgdexFetcher(db: Db, config: Config) {
          ON CONFLICT (key) DO UPDATE SET body = EXCLUDED.body, fetched_at = now()`,
         [pathAndQuery, JSON.stringify(body)],
       )
-      const cardMatch = /^\/v2\/(?:fr|en)\/cards\/([^/?]+)$/.exec(pathAndQuery)
-      if (cardMatch) await recordSnapshot(db, decodeURIComponent(cardMatch[1]), (body as { pricing?: CardPricing }).pricing)
+      // Fiche d'une carte : on note son prix du jour (cartes asiatiques : identifiant préfixé par la langue).
+      const cardMatch = /^\/v2\/(fr|en|ja|ko|zh-tw|zh-cn|th|id)\/cards\/([^/?]+)$/.exec(pathAndQuery)
+      if (cardMatch) {
+        const raw = decodeURIComponent(cardMatch[2])
+        const id = ['fr', 'en'].includes(cardMatch[1]) ? raw : `${cardMatch[1]}:${raw}`
+        await recordSnapshot(db, id, (body as { pricing?: CardPricing }).pricing)
+      }
       return { status: 200, body, cache: 'miss' }
     } catch {
       return cached ? { status: 200, body: cached.body, cache: 'stale' } : { status: 503, body: null, cache: 'miss' }

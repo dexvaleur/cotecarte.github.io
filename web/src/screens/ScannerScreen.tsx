@@ -11,7 +11,8 @@ import { Card, ScreenTitle } from '../components/ui'
 import { useOnline } from '../lib/useOnline'
 import { canvasToDataUrl, cropToCard, fileToCanvas, findCard } from '../scan/image'
 import { OcrLoadError, warmUpOcr } from '../scan/ocr'
-import { type Recognition, recognizeCard } from '../scan/recognize'
+import { load, save } from '../lib/storage'
+import { type Recognition, recognizeCard, type ScanLang } from '../scan/recognize'
 
 type Phase =
   | { name: 'idle' }
@@ -26,8 +27,24 @@ let lastPhase: Phase = { name: 'idle' }
 /** Erreur de chargement d'un morceau de l'appli (souvent juste après une mise à jour). */
 const isChunkError = (e: unknown) => /dynamically imported module|Importing a module script failed|Failed to fetch|Load failed/i.test(String((e as Error)?.message ?? e))
 
+/** Langues proposées pour le scanner (les cartes européennes partagent les mêmes extensions). */
+const SCAN_LANGS: { id: ScanLang; label: string }[] = [
+  { id: 'auto', label: '🇫🇷 🇬🇧 Françaises, anglaises, européennes' },
+  { id: 'ja', label: '🇯🇵 Japonaises' },
+  { id: 'ko', label: '🇰🇷 Coréennes' },
+  { id: 'zh-tw', label: '🇹🇼 Chinoises (traditionnel)' },
+  { id: 'zh-cn', label: '🇨🇳 Chinoises (simplifié)' },
+  { id: 'th', label: '🇹🇭 Thaïlandaises' },
+  { id: 'id', label: '🇮🇩 Indonésiennes' },
+]
+
 export function ScannerScreen() {
   const [phase, setPhaseState] = useState<Phase>(lastPhase)
+  const [lang, setLangState] = useState<ScanLang>(() => load<ScanLang>('scanLang', 'auto'))
+  const setLang = (l: ScanLang) => {
+    save('scanLang', l)
+    setLangState(l)
+  }
   const setPhase = (p: Phase) => {
     lastPhase = p.name === 'camera' || p.name === 'analyzing' ? { name: 'idle' } : p
     setPhaseState(p)
@@ -48,11 +65,11 @@ export function ScannerScreen() {
         const step = p.status.includes('load') ? 'Chargement du lecteur de texte…' : 'Lecture du nom et du numéro…'
         setPhaseState((cur) => (cur.name === 'analyzing' && cur.step !== step ? { ...cur, step } : cur))
       }
-      let rec = await recognizeCard(attempts[0], onProgress)
+      let rec = await recognizeCard(attempts[0], onProgress, lang)
       for (const views of attempts.slice(1)) {
         if (rec.confident) break
         setPhaseState((cur) => (cur.name === 'analyzing' ? { ...cur, step: 'Deuxième essai avec une autre image…' } : cur))
-        const other = await recognizeCard(views, onProgress).catch(() => null)
+        const other = await recognizeCard(views, onProgress, lang).catch(() => null)
         if (other) rec = mergeRecognitions(rec, other)
       }
       trackScan()
@@ -115,6 +132,8 @@ export function ScannerScreen() {
 
       {(phase.name === 'idle' || phase.name === 'camera') && (
         <Idle
+          lang={lang}
+          onLang={setLang}
           online={online}
           onCamera={() => {
             warmUpOcr()
@@ -167,7 +186,19 @@ export function ScannerScreen() {
   )
 }
 
-function Idle({ online, onCamera, onFile }: { online: boolean; onCamera: () => void; onFile: () => void }) {
+function Idle({
+  online,
+  onCamera,
+  onFile,
+  lang,
+  onLang,
+}: {
+  online: boolean
+  onCamera: () => void
+  onFile: () => void
+  lang: ScanLang
+  onLang: (l: ScanLang) => void
+}) {
   return (
     <>
       <ScreenTitle title="Scanner une carte" subtitle="Photographie ta carte, on s'occupe du reste." />
@@ -183,6 +214,25 @@ function Idle({ online, onCamera, onFile }: { online: boolean; onCamera: () => v
           </div>
         </div>
       </button>
+
+      <label className="mx-auto mt-4 flex max-w-xs items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-1.5 text-sm">
+        <span className="shrink-0 font-semibold text-muted">Cartes :</span>
+        <select
+          value={lang}
+          onChange={(e) => onLang(e.target.value as ScanLang)}
+          aria-label="Langue des cartes à scanner"
+          className="min-w-0 flex-1 truncate bg-transparent py-1 font-semibold outline-none"
+        >
+          {SCAN_LANGS.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {lang !== 'auto' && (
+        <p className="mx-auto mt-1 max-w-xs text-center text-xs text-muted">Le scanner lit le numéro en bas de la carte et compare l’illustration.</p>
+      )}
 
       {!online && (
         <p className="mt-4 rounded-2xl bg-warn/15 px-4 py-2 text-center text-sm font-semibold text-warn">
@@ -298,6 +348,11 @@ function Results({ preview, rec, onRetry, onReset }: { preview: string; rec: Rec
           {rec.candidates.length ? 'Aucune ne correspond : rechercher à la main' : 'Rechercher à la main'}
         </Link>
       </div>
+      {load<ScanLang>('scanLang', 'auto') === 'auto' && (
+        <p className="mt-4 rounded-2xl bg-surface-2 px-3 py-2 text-sm">
+          🇯🇵 Carte <b>japonaise, coréenne, chinoise…</b> ? Sur l’écran du scanner, choisis la langue dans « Cartes : » puis reprends la photo.
+        </p>
+      )}
     </>
   )
 }

@@ -26,6 +26,10 @@ const tcgdex: Server = createServer((req, res) => {
   tcgdexCalls++
   if (tcgdexDown) return res.writeHead(500).end()
   if (req.url === '/v2/fr/cards/sv03.5-006') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(fakeCard))
+  if (req.url === '/v2/ja/cards/SV2a-006')
+    return res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(JSON.stringify({ ...fakeCard, id: 'SV2a-006', name: 'リザードンex', pricing: { cardmarket: { trend: 2.87 } } }))
   res.writeHead(404).end()
 })
 
@@ -291,6 +295,15 @@ describe('cartes, cache et prix', () => {
     const rows = await db.query(`SELECT 1 FROM price_snapshots WHERE card_id = 'sv03.5-006' AND day = current_date`)
     assert.equal(rows.length, 1)
   })
+})
+
+test('cartes japonaises : prix et historique avec l’identifiant « ja:… »', async () => {
+  const r = await app.inject({ method: 'POST', url: '/prices/latest', payload: { ids: ['ja:SV2a-006'] } })
+  assert.equal(r.json().prices['ja:SV2a-006'].eur, 2.87)
+  const h = await app.inject({ method: 'GET', url: '/prices/ja%3ASV2a-006/history' })
+  assert.equal(h.json().points.at(-1).trend, 2.87)
+  const proxy = await app.inject({ method: 'GET', url: '/tcgdex/v2/ja/cards/SV2a-006' })
+  assert.equal(proxy.statusCode, 200)
 })
 
 describe('classeurs', () => {

@@ -9,7 +9,7 @@ import { decrement } from '../components/OwnedCopies'
 import { CardImage } from '../components/CardThumb'
 import { PriceChart } from '../components/PriceChart'
 import { Card, ScreenTitle } from '../components/ui'
-import { CONDITIONS, type ConditionCode, rarityInfo } from '../data/cardInfo'
+import { CONDITIONS, type ConditionCode, frLabel, rarityInfo } from '../data/cardInfo'
 import { useSession } from '../lib/api'
 import { type CollectionItem, removeItem, removeWish, updateItem, useCollectionState } from '../lib/collection'
 import { arrange, dexNumber, SORT_MODES, type SortMode } from '../lib/collectionSort'
@@ -181,7 +181,7 @@ function Cards({ items, prices }: { items: CollectionItem[]; prices: Record<stri
         return {
           item: i,
           rarity: i.rarity ?? p?.rarity,
-          types: i.types?.length ? i.types : (p?.types ?? []),
+          types: (i.types?.length ? i.types : (p?.types ?? [])).map(frLabel),
           unit: itemValue(i, p?.eur),
         }
       }),
