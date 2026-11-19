@@ -62,10 +62,26 @@ export async function saveMyPhotoFromDataUrl(cardId: string, dataUrl: string) {
 }
 
 /** Dernière carte scannée, pour l'enregistrer comme photo si on l'ajoute à la collection. */
-let lastScan: { dataUrl: string; at: number } | null = null
-export function rememberScanPhoto(dataUrl: string) {
-  lastScan = { dataUrl, at: Date.now() }
+export interface ScanInfo {
+  dataUrl: string
+  /** Carte ouverte directement par le scanner (s'il était sûr de lui) */
+  openedId?: string
+  /** Ce que le scanner a lu (nom · numéro) */
+  read: string
+  at: number
+}
+let lastScan: ScanInfo | null = null
+export function rememberScanPhoto(dataUrl: string, openedId?: string, read = '') {
+  lastScan = { dataUrl, openedId, read, at: Date.now() }
+}
+/** Dernier scan s'il date de moins de 15 minutes. */
+export function recentScan(): ScanInfo | undefined {
+  return lastScan && Date.now() - lastScan.at < 15 * 60 * 1000 ? lastScan : undefined
 }
 export function recentScanPhoto(): string | undefined {
-  return lastScan && Date.now() - lastScan.at < 15 * 60 * 1000 ? lastScan.dataUrl : undefined
+  return recentScan()?.dataUrl
+}
+/** Le scan a été « consommé » (carte ajoutée) : on ne le réutilise pas pour une autre carte. */
+export function forgetScan() {
+  lastScan = null
 }

@@ -198,3 +198,31 @@ export function canvasToDataUrl(c: HTMLCanvasElement, maxW = 480): string {
   small.getContext('2d')!.drawImage(c, 0, 0, small.width, small.height)
   return small.toDataURL('image/jpeg', 0.8)
 }
+
+/**
+ * Netteté d'une image : variance du laplacien sur une version réduite en gris.
+ * Plus c'est élevé, plus les contours sont nets (une photo bougée ou floue donne une valeur basse).
+ */
+export function sharpness(src: CanvasImageSource & { width: number; height: number }): number {
+  const W = 320
+  const H = Math.max(1, Math.round((src.height / src.width) * W))
+  const c = makeCanvas(W, H)
+  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(src, 0, 0, W, H)
+  const d = ctx.getImageData(0, 0, W, H).data
+  const g = new Float32Array(W * H)
+  for (let i = 0; i < W * H; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]
+  let sum = 0
+  let sum2 = 0
+  let n = 0
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
+      const i = y * W + x
+      const lap = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - W] - g[i + W]
+      sum += lap
+      sum2 += lap * lap
+      n++
+    }
+  }
+  return n ? sum2 / n - (sum / n) ** 2 : 0
+}
