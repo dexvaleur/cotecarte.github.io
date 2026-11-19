@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router'
-import { BinderIcon, BoosterIcon, CoinIcon, DexIcon, RadioIcon } from './TabIcons'
+import { BinderIcon, BoosterIcon, CoinIcon, DexIcon, ProfileIcon, RadioIcon } from './TabIcons'
 
 const TABS = [
   { to: '/scanner', label: 'Scanner', Icon: DexIcon },
@@ -7,6 +7,7 @@ const TABS = [
   { to: '/packs', label: 'Packs', Icon: BoosterIcon },
   { to: '/actus', label: 'Actus', Icon: RadioIcon },
   { to: '/vendre', label: 'Vendre', Icon: CoinIcon },
+  { to: '/profil', label: 'Profil', Icon: ProfileIcon },
 ]
 
 /** Barre d'onglets en bas de l'écran, facile à atteindre avec le pouce. */
@@ -22,7 +23,7 @@ export function TabBar() {
             <NavLink
               to={to}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition-colors ${
+                `flex flex-col items-center gap-0.5 py-2 text-[10.5px] font-semibold transition-colors ${
                   isActive ? 'text-primary' : 'text-muted'
                 }`
               }
@@ -30,7 +31,7 @@ export function TabBar() {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`grid h-9 w-14 place-items-center rounded-full transition-colors ${
+                    className={`grid h-9 w-12 place-items-center rounded-full transition-colors ${
                       isActive ? 'bg-primary-soft' : ''
                     }`}
                   >

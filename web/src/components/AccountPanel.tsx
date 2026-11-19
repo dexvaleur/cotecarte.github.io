@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { API_URL, deleteAccount, logout, requestCode, useSession, verifyCode } from '../lib/api'
 import { clearLocal, importLocalThenSync, syncNow, useCollectionState } from '../lib/collection'
+import { syncProfile } from '../lib/profile'
 import { timeAgo } from '../lib/format'
 
 /**
@@ -140,6 +141,7 @@ function LoginForm({ compact }: { compact: boolean }) {
     try {
       await verifyCode(email, code)
       await importLocalThenSync()
+      void syncProfile()
     } catch (err) {
       setError((err as Error).message)
     } finally {

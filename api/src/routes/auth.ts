@@ -137,6 +137,28 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
     return { user, isAdmin: adminSet(config).has(user.email) }
   })
 
+  // Profil : pseudo + avatar. Seul l'utilisateur le voit (aucun profil public).
+  app.get('/profile', async (req, reply) => {
+    const user = requireUser(req)
+    if (!user) return reply.code(401).send({ error: 'Non connecté.' })
+    const rows = await db.query<{ profile: unknown }>('SELECT profile FROM users WHERE id = $1', [user.id])
+    return { profile: rows[0]?.profile ?? null }
+  })
+
+  const profileBody = z.object({
+    pseudo: z.string().trim().max(24),
+    avatar: z.record(z.string().max(24), z.union([z.string().max(24), z.number().min(0).max(1)])).refine((a) => Object.keys(a).length <= 40),
+    updatedAt: z.string().max(40),
+  })
+  app.put('/profile', async (req, reply) => {
+    const user = requireUser(req)
+    if (!user) return reply.code(401).send({ error: 'Non connecté.' })
+    const parsed = profileBody.safeParse(req.body)
+    if (!parsed.success) return reply.code(400).send({ error: 'Profil invalide.' })
+    await db.query('UPDATE users SET profile = $2 WHERE id = $1', [user.id, JSON.stringify(parsed.data)])
+    return { ok: true }
+  })
+
   // Suppression du compte et de toutes ses données (droit à l'effacement, RGPD).
   app.delete('/me', async (req, reply) => {
     const user = requireUser(req)
