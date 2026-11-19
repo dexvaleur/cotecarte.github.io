@@ -6,6 +6,7 @@ import { CardImage } from '../components/CardThumb'
 import { Card } from '../components/ui'
 import { useSession } from '../lib/api'
 import {
+  ACCESSORIES,
   type Avatar,
   BOTTOMS,
   CLOTH_COLORS,
@@ -158,6 +159,7 @@ const SECTIONS = [
   { id: 'bas', label: '👖 Bas' },
   { id: 'chaussures', label: '👟 Chaussures' },
   { id: 'gants', label: '🧤 Gants' },
+  { id: 'accessoire', label: '🎒 Accessoire' },
 ] as const
 
 type Section = (typeof SECTIONS)[number]['id']
@@ -175,7 +177,7 @@ export function AvatarEditorScreen() {
   }
 
   // Petit aperçu d'un choix : tête pour le visage et les chapeaux, corps entier pour les vêtements.
-  const options = <K extends keyof Avatar>(title: string, k: K, list: Record<string, string>, crop: 'head' | 'full' | 'none' = 'head') => (
+  const options = <K extends keyof Avatar>(title: string, k: K, list: Record<string, string>, crop: 'head' | 'bust' | 'full' | 'none' = 'head') => (
     <div className="mt-4">
       <p className="mb-2 text-sm font-bold">{title}</p>
       <div role="radiogroup" aria-label={title} className="grid grid-cols-4 gap-2">
@@ -189,7 +191,7 @@ export function AvatarEditorScreen() {
               onClick={() => set(k, v as Avatar[K])}
               className={`flex flex-col items-center rounded-2xl border-2 p-1 text-[11px] leading-tight font-semibold ${on ? 'border-primary bg-primary-soft' : 'border-line bg-surface'}`}
             >
-              {crop !== 'none' && <AvatarView a={{ ...a, [k]: v }} crop={crop} className={crop === 'head' ? 'h-14 w-14' : 'h-24 w-12'} />}
+              {crop !== 'none' && <AvatarView a={{ ...a, [k]: v }} crop={crop} className={crop === 'head' ? 'h-14 w-14' : crop === 'bust' ? 'h-16 w-14' : 'h-24 w-12'} />}
               <span className="py-1">{label}</span>
             </button>
           )
@@ -323,8 +325,9 @@ export function AvatarEditorScreen() {
         )}
         {section === 'haut' && (
           <>
-            {options('Haut', 'top', TOPS, 'full')}
+            {options('Haut', 'top', TOPS, 'bust')}
             {colors('Couleur', 'topColor', CLOTH_COLORS)}
+            {colors('Couleur des détails (bandes, empiècements)', 'accentColor', CLOTH_COLORS)}
           </>
         )}
         {section === 'bas' && (
@@ -343,6 +346,12 @@ export function AvatarEditorScreen() {
           <>
             {options('Gants', 'gloves', GLOVES, 'full')}
             {a.gloves !== 'aucun' && colors('Couleur', 'glovesColor', CLOTH_COLORS)}
+          </>
+        )}
+        {section === 'accessoire' && (
+          <>
+            {options('Accessoire', 'accessory', ACCESSORIES, 'full')}
+            {a.accessory !== 'aucun' && colors('Couleur', 'accessoryColor', CLOTH_COLORS)}
           </>
         )}
       </div>

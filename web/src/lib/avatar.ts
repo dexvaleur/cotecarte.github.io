@@ -25,6 +25,9 @@ export interface Avatar {
   shoesColor: string
   gloves: GloveStyle
   glovesColor: string
+  accentColor: string // couleur des détails : bandes, liserés, empiècements
+  accessory: AccessoryStyle
+  accessoryColor: string
 }
 
 export const HAIR = { court: 'Court', piquant: 'Piquant', long: 'Long', queue: 'Queue de cheval', couettes: 'Couettes', chignon: 'Chignon', boucle: 'Bouclé', rase: 'Rasé', chauve: 'Sans cheveux' } as const
@@ -33,10 +36,11 @@ export const EYES = { rond: 'Ronds', grand: 'Grands', joyeux: 'Joyeux', determin
 export const LASHES = { aucun: 'Aucun', courts: 'Courts', longs: 'Longs' } as const
 export const NOSES = { point: 'Petit point', petit: 'Petit', rond: 'Rond', aucun: 'Aucun' } as const
 export const MOUTHS = { sourire: 'Sourire', grand: 'Grand sourire', neutre: 'Neutre', o: 'Étonné', langue: 'Langue', chat: 'Malicieux' } as const
-export const TOPS = { tshirt: 'T-shirt', debardeur: 'Débardeur', pull: 'Pull', sweat: 'Sweat à capuche' } as const
+export const TOPS = { tshirt: 'T-shirt', debardeur: 'Débardeur', pull: 'Pull', sweat: 'Sweat à capuche', veste: 'Veste' } as const
 export const BOTTOMS = { pantalon: 'Pantalon', short: 'Short', jupe: 'Jupe' } as const
 export const SHOES = { baskets: 'Baskets', bottes: 'Bottes' } as const
 export const GLOVES = { aucun: 'Aucun', gants: 'Gants', mitaines: 'Mitaines' } as const
+export const ACCESSORIES = { aucun: 'Aucun', sac: 'Sac à dos', ceinture: 'Ceinture', bandouliere: 'Bandoulière', bandeau: 'Bandeau' } as const
 
 export type HairStyle = keyof typeof HAIR
 export type HatStyle = keyof typeof HATS
@@ -48,6 +52,7 @@ export type TopStyle = keyof typeof TOPS
 export type BottomStyle = keyof typeof BOTTOMS
 export type ShoeStyle = keyof typeof SHOES
 export type GloveStyle = keyof typeof GLOVES
+export type AccessoryStyle = keyof typeof ACCESSORIES
 
 export const SKIN_COLORS = ['#fde3cf', '#f6d0b1', '#f1c27d', '#e0ac69', '#c68642', '#a86b3c', '#8d5524', '#6b3e1f', '#4a2a14', '#2d1a0e', '#9ad0ff', '#b6f2a8', '#d8b4ff', '#ffb3c6']
 export const HAIR_COLORS = ['#1b1b22', '#3b2416', '#6b4226', '#a0672f', '#e6c35c', '#f3e6b0', '#c4502a', '#d42f43', '#d9d9e0', '#2f6fde', '#3aa84a', '#ff7eb6', '#8b5cf6']
@@ -60,22 +65,25 @@ export const BOY: Avatar = {
   build: 0.5,
   skin: '#f1c27d',
   hair: 'piquant',
-  hairColor: '#3b2416',
-  hat: 'casquette',
+  hairColor: '#1b1b22',
+  hat: 'aucun',
   hatColor: '#e3343f',
   eyes: 'rond',
-  eyeColor: '#2b2b3a',
+  eyeColor: '#5a3a1e',
   lashes: 'aucun',
-  nose: 'point',
+  nose: 'petit',
   mouth: 'sourire',
-  top: 'tshirt',
-  topColor: '#2f8ff0',
+  top: 'sweat',
+  topColor: '#e3343f',
   bottom: 'pantalon',
-  bottomColor: '#2b3557',
+  bottomColor: '#1f2433',
   shoes: 'baskets',
-  shoesColor: '#e3343f',
+  shoesColor: '#2b2f3a',
   gloves: 'mitaines',
-  glovesColor: '#3bb35a',
+  glovesColor: '#1b1b22',
+  accentColor: '#ffffff',
+  accessory: 'aucun',
+  accessoryColor: '#3bb35a',
 }
 
 export const GIRL: Avatar = {
@@ -83,20 +91,22 @@ export const GIRL: Avatar = {
   gender: 'girl',
   height: 0.4,
   build: 0.35,
-  hair: 'long',
-  hairColor: '#6b4226',
+  hair: 'queue',
+  hairColor: '#3b2416',
   hat: 'aucun',
   hatColor: '#ffffff',
-  eyes: 'grand',
-  eyeColor: '#2f8ff0',
-  lashes: 'longs',
-  top: 'pull',
-  topColor: '#d14ea8',
-  bottom: 'jupe',
-  bottomColor: '#2b3557',
-  shoes: 'baskets',
-  shoesColor: '#ffffff',
+  eyes: 'rond',
+  eyeColor: '#5a3a1e',
+  lashes: 'courts',
+  top: 'debardeur',
+  topColor: '#5b6470',
+  bottom: 'pantalon',
+  bottomColor: '#6b5a48',
+  shoes: 'bottes',
+  shoesColor: '#3b2a20',
   gloves: 'aucun',
+  accessory: 'ceinture',
+  accessoryColor: '#5a3a22',
 }
 
 /** Change le genre : on reprend la coiffure et les cils du style de départ, le reste est gardé. */
@@ -131,6 +141,9 @@ export function randomAvatar(): Avatar {
     shoesColor: pick(CLOTH_COLORS),
     gloves: pick(Object.keys(GLOVES) as GloveStyle[]),
     glovesColor: pick(CLOTH_COLORS),
+    accentColor: pick(CLOTH_COLORS),
+    accessory: pick(Object.keys(ACCESSORIES) as AccessoryStyle[]),
+    accessoryColor: pick(CLOTH_COLORS),
   }
 }
 
@@ -139,7 +152,7 @@ export function normalizeAvatar(raw: unknown): Avatar {
   const a = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const base = a.gender === 'girl' ? GIRL : BOY
   const out = { ...base } as Record<string, unknown>
-  const lists: Record<string, object> = { hair: HAIR, hat: HATS, eyes: EYES, lashes: LASHES, nose: NOSES, mouth: MOUTHS, top: TOPS, bottom: BOTTOMS, shoes: SHOES, gloves: GLOVES }
+  const lists: Record<string, object> = { hair: HAIR, hat: HATS, eyes: EYES, lashes: LASHES, nose: NOSES, mouth: MOUTHS, top: TOPS, bottom: BOTTOMS, shoes: SHOES, gloves: GLOVES, accessory: ACCESSORIES }
   for (const k of Object.keys(base)) {
     const v = a[k]
     if (k === 'gender') continue
@@ -160,4 +173,12 @@ export function shade(hex: string, amt: number): string {
   const g = mix((n >> 8) & 255)
   const b = mix(n & 255)
   return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)
+}
+
+/** Mélange deux couleurs « #rrggbb » (t = 0 → a, t = 1 → b). */
+export function mix(a: string, b: string, t: number): string {
+  const x = parseInt(a.slice(1), 16)
+  const y = parseInt(b.slice(1), 16)
+  const c = (sh: number) => Math.round(((x >> sh) & 255) * (1 - t) + ((y >> sh) & 255) * t)
+  return '#' + ((1 << 24) | (c(16) << 16) | (c(8) << 8) | c(0)).toString(16).slice(1)
 }
