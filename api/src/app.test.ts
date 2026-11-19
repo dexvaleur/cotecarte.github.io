@@ -323,3 +323,30 @@ test('mailer Brevo : envoie le code via l’API HTTPS', async () => {
   const failing = await createMailer(config, () => {}, (async () => new Response('bad key', { status: 401 })) as unknown as typeof fetch)
   await assert.rejects(failing.sendLoginCode('ami@gmail.com', '123456'), /Brevo 401/)
 })
+
+test('packs : statistiques d’une extension', async () => {
+  const { computeSetStats } = await import('./packs.js')
+  const pricing = (trend: number | null) => ({ cardmarket: { trend, avg: null, low: null, avg30: null } })
+  const set = { id: 'x1', name: 'Test', releaseDate: '2025-01-01', serie: { id: 'me', name: 'Méga' }, cardCount: { official: 3, total: 5 } }
+  const cards = [
+    { id: 'x1-001', localId: '001', name: 'A', pricing: pricing(0.1) },
+    { id: 'x1-002', localId: '002', name: 'B', pricing: pricing(6) },
+    { id: 'x1-003', localId: '003', name: 'C', pricing: pricing(null) },
+    { id: 'x1-004', localId: '004', name: 'D', pricing: pricing(25) },
+    { id: 'x1-005', localId: '005', name: 'E', pricing: pricing(15) },
+  ]
+  const s = computeSetStats(set, cards)
+  assert.equal(s.priced, 4)
+  assert.deepEqual(s.top.map((c) => c.id), ['x1-004', 'x1-005', 'x1-002', 'x1-001'])
+  assert.equal(s.over5, 3)
+  assert.equal(s.over20, 1)
+  assert.equal(s.secretCount, 2)
+  assert.equal(s.secretAvg, 20)
+  assert.equal(s.fullSetEur, 46.1)
+})
+
+test('packs : liste vide au premier lancement, sans erreur', async () => {
+  const r = await app.inject({ method: 'GET', url: '/packs' })
+  assert.equal(r.statusCode, 200)
+  assert.deepEqual(r.json().sets, [])
+})

@@ -1,5 +1,6 @@
 import type { Config } from './config.js'
 import type { Db } from './db/index.js'
+import { refreshPackStats } from './packs.js'
 import { type CardPricing, createTcgdexFetcher, mapLimit, recordSnapshot } from './routes/cards.js'
 
 /**
@@ -35,6 +36,8 @@ export function startJobs(db: Db, config: Config, log: (msg: string) => void): (
     snapshotPrices(db, config)
       .then((n) => n && log(`💶 Prix du jour enregistrés pour ${n} carte(s)`))
       .catch((err) => log(`Tâche des prix en échec : ${(err as Error).message}`))
+      .then(() => refreshPackStats(db, config, log))
+      .catch((err) => log(`Statistiques des packs en échec : ${(err as Error).message}`))
   const first = setTimeout(run, 10_000)
   const timer = setInterval(run, 6 * 3_600_000)
   return () => {
