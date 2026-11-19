@@ -1,12 +1,12 @@
-import { Gift, Layers, Newspaper, ScanLine, Tag } from 'lucide-react'
 import { NavLink } from 'react-router'
+import { BinderIcon, BoosterIcon, CoinIcon, DexIcon, RadioIcon } from './TabIcons'
 
 const TABS = [
-  { to: '/scanner', label: 'Scanner', Icon: ScanLine },
-  { to: '/collection', label: 'Collection', Icon: Layers },
-  { to: '/packs', label: 'Packs', Icon: Gift },
-  { to: '/actus', label: 'Actus', Icon: Newspaper },
-  { to: '/vendre', label: 'Vendre', Icon: Tag },
+  { to: '/scanner', label: 'Scanner', Icon: DexIcon },
+  { to: '/collection', label: 'Collection', Icon: BinderIcon },
+  { to: '/packs', label: 'Packs', Icon: BoosterIcon },
+  { to: '/actus', label: 'Actus', Icon: RadioIcon },
+  { to: '/vendre', label: 'Vendre', Icon: CoinIcon },
 ]
 
 /** Barre d'onglets en bas de l'écran, facile à atteindre avec le pouce. */
@@ -30,11 +30,11 @@ export function TabBar() {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`grid h-8 w-14 place-items-center rounded-full transition-colors ${
+                    className={`grid h-9 w-14 place-items-center rounded-full transition-colors ${
                       isActive ? 'bg-primary-soft' : ''
                     }`}
                   >
-                    <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                    <Icon active={isActive} />
                   </span>
                   {label}
                 </>
