@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { API_URL } from './api'
+import { API_URL, fetchIsAdmin, getSession } from './api'
 import { load, save } from './storage'
 
 /**
@@ -13,7 +13,30 @@ import { load, save } from './storage'
 type Metric = 'open' | 'visitor' | 'new' | 'scan'
 
 export function statsEnabled(): boolean {
-  return !load('statsOff', false)
+  return !load('statsOff', false) && !load('statsAdmin', false)
+}
+
+/**
+ * Les visites de l'administrateur ne comptent pas : dès qu'il se connecte sur un appareil,
+ * cet appareil est marqué et n'envoie plus rien (même après déconnexion).
+ */
+async function isAdminDevice(): Promise<boolean> {
+  if (load('statsAdmin', false)) return true
+  if (!getSession()) return false
+  try {
+    if (await fetchIsAdmin()) {
+      save('statsAdmin', true)
+      return true
+    }
+  } catch {
+    /* serveur endormi : on ne bloque pas */
+  }
+  return false
+}
+
+/** À appeler quand on apprend que l'utilisateur est l'administrateur. */
+export function markAdminDevice() {
+  save('statsAdmin', true)
 }
 
 function send(events: Metric[]) {
@@ -29,7 +52,8 @@ function send(events: Metric[]) {
 const today = () => new Date().toISOString().slice(0, 10)
 
 /** À l'ouverture de l'appli. */
-export function trackOpen() {
+export async function trackOpen() {
+  if (await isAdminDevice()) return
   const events: Metric[] = ['open']
   const last = load<string | null>('statsDay', null)
   if (last !== today()) {

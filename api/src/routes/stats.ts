@@ -40,11 +40,12 @@ export async function statsRoutes(app: FastifyInstance, { db, config }: { db: Db
 
     const [totals] = await db.query<{ users: number; collectors: number; cards: number; visitors30: number; scans30: number }>(
       `SELECT
-         (SELECT count(*)::int FROM users) AS users,
-         (SELECT count(DISTINCT user_id)::int FROM collection_items) AS collectors,
-         (SELECT coalesce(sum(quantity), 0)::int FROM collection_items) AS cards,
+         (SELECT count(*)::int FROM users WHERE NOT lower(email) = ANY($1)) AS users,
+         (SELECT count(DISTINCT c.user_id)::int FROM collection_items c JOIN users u ON u.id = c.user_id WHERE NOT lower(u.email) = ANY($1)) AS collectors,
+         (SELECT coalesce(sum(c.quantity), 0)::int FROM collection_items c JOIN users u ON u.id = c.user_id WHERE NOT lower(u.email) = ANY($1)) AS cards,
          (SELECT coalesce(sum(count), 0)::int FROM stats_daily WHERE metric = 'visitor' AND day > current_date - 30) AS visitors30,
          (SELECT coalesce(sum(count), 0)::int FROM stats_daily WHERE metric = 'scan' AND day > current_date - 30) AS scans30`,
+      [[...admins]],
     )
     const days = await db.query<{ day: string; open: number; visitor: number; new: number; scan: number; signups: number; logins: number }>(
       `WITH d AS (SELECT generate_series(current_date - 29, current_date, interval '1 day')::date AS day)
@@ -53,9 +54,10 @@ export async function statsRoutes(app: FastifyInstance, { db, config }: { db: Db
          coalesce((SELECT count FROM stats_daily s WHERE s.day = d.day AND metric = 'visitor'), 0) AS visitor,
          coalesce((SELECT count FROM stats_daily s WHERE s.day = d.day AND metric = 'new'), 0) AS new,
          coalesce((SELECT count FROM stats_daily s WHERE s.day = d.day AND metric = 'scan'), 0) AS scan,
-         (SELECT count(*)::int FROM users u WHERE date(u.created_at) = d.day) AS signups,
-         (SELECT count(*)::int FROM sessions x WHERE date(x.created_at) = d.day) AS logins
+         (SELECT count(*)::int FROM users u WHERE date(u.created_at) = d.day AND NOT lower(u.email) = ANY($1)) AS signups,
+         (SELECT count(*)::int FROM sessions x JOIN users u ON u.id = x.user_id WHERE date(x.created_at) = d.day AND NOT lower(u.email) = ANY($1)) AS logins
        FROM d ORDER BY d.day DESC`,
+      [[...admins]],
     )
     return { totals, days }
   })

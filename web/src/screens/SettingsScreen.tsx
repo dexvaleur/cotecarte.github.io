@@ -5,7 +5,7 @@ import { AccountPanel } from '../components/AccountPanel'
 import { Card, ScreenTitle } from '../components/ui'
 import { LegalLinks } from './LegalScreen'
 import { fetchIsAdmin, useSession } from '../lib/api'
-import { useStatsChoice } from '../lib/stats'
+import { markAdminDevice, useStatsChoice } from '../lib/stats'
 import { clearFailedScans, shareFailedScans, useFailedScans } from '../lib/scanLog'
 import { type ThemeChoice, useTheme } from '../lib/theme'
 
@@ -75,7 +75,10 @@ function AdminLink() {
   useEffect(() => {
     if (!session) return setAdmin(false)
     fetchIsAdmin()
-      .then(setAdmin)
+      .then((a) => {
+        if (a) markAdminDevice()
+        setAdmin(a)
+      })
       .catch(() => setAdmin(false))
   }, [session])
   if (!admin) return null
