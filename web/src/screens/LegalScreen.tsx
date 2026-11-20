@@ -175,8 +175,15 @@ const PAGES: Record<LegalPageId, ReactNode> = {
           sauvegarder et les retrouver sur tous tes appareils.
         </li>
         <li>
-          <b>Ton profil</b> (pseudo et réglages de ton avatar) : pour le retrouver sur tous tes appareils. Il n’est
-          visible par personne d’autre que toi.
+          <b>Ton profil</b> (pseudo et réglages de ton avatar) : pour le retrouver sur tous tes appareils. Ton pseudo
+          et ton avatar sont visibles par les autres membres uniquement sur tes annonces et dans tes discussions.
+          Ton email n’est jamais montré.
+        </li>
+        <li>
+          <b>Tes annonces et tes messages</b> (onglet Vendre) : les annonces (photos, titre, prix, description,
+          hashtags) sont visibles par tous ; les messages ne sont visibles que par les deux membres de la
+          discussion. Les signalements sont lus par l’éditeur pour retirer les annonces abusives. Tout est effacé
+          quand tu supprimes l’annonce ou ton compte.
         </li>
         <li>
           <b>Données techniques</b> : la date d’acceptation des conditions, des empreintes chiffrées des codes et des
@@ -263,26 +270,35 @@ const PAGES: Record<LegalPageId, ReactNode> = {
         décision prise à partir de ces informations.
       </p>
 
-      <H>4. Bonne utilisation</H>
+      <H>4. Vente et échange entre membres</H>
+      <p>
+        L’onglet Vendre permet aux membres de publier des annonces et de discuter entre eux. DexValeur n’est{' '}
+        <b>ni vendeur ni intermédiaire</b> : il ne touche aucune commission, ne gère aucun paiement ni envoi, et ne
+        garantit pas les cartes. La vente se fait directement entre les deux membres, sous leur responsabilité.
+        Interdit : fausses cartes (proxies) présentées comme vraies, arnaques, objets sans rapport avec les cartes,
+        contenus choquants. Les annonces signalées peuvent être supprimées et leur auteur bloqué.
+      </p>
+
+      <H>5. Bonne utilisation</H>
       <p>
         Pas d’utilisation automatisée massive, pas de tentative d’accéder aux comptes des autres ou de perturber le
         service. En cas d’abus, l’accès peut être bloqué.
       </p>
 
-      <H>5. Disponibilité</H>
+      <H>6. Disponibilité</H>
       <p>
         Le service est fourni « tel quel », par un particulier, sans garantie de disponibilité. Il peut être
         interrompu, modifié ou arrêté. En cas d’arrêt définitif, les utilisateurs pourront récupérer leurs données
         (« Télécharger mes données ») avant la fermeture.
       </p>
 
-      <H>6. Propriété</H>
+      <H>7. Propriété</H>
       <p>
         Les marques et images Pokémon appartiennent à leurs propriétaires (voir Mentions légales). Les photos que tu
         ajoutes restent à toi et sont gardées sur ton téléphone.
       </p>
 
-      <H>7. Changements et droit applicable</H>
+      <H>8. Changements et droit applicable</H>
       <p>
         Ces conditions peuvent évoluer : la date de mise à jour est indiquée en haut. Elles sont soumises au droit
         français. Contact : <Contact />

@@ -15,6 +15,9 @@ import { PacksScreen } from './screens/PacksScreen'
 import { AvatarEditorScreen, ProfileScreen } from './screens/ProfileScreen'
 import { ScannerScreen } from './screens/ScannerScreen'
 import { SellScreen } from './screens/SellScreen'
+import { ListingScreen } from './screens/ListingScreen'
+import { ListingFormScreen } from './screens/ListingFormScreen'
+import { ChatScreen } from './screens/ChatScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { StatsScreen } from './screens/StatsScreen'
 
@@ -42,6 +45,10 @@ export default function App() {
         <Route path="packs" element={<PacksScreen />} />
         <Route path="actus" element={<NewsScreen />} />
         <Route path="vendre" element={<SellScreen />} />
+        <Route path="vendre/nouvelle" element={<ListingFormScreen />} />
+        <Route path="vendre/annonce/:id" element={<ListingScreen />} />
+        <Route path="vendre/annonce/:id/modifier" element={<ListingFormScreen />} />
+        <Route path="vendre/chat/:id" element={<ChatScreen />} />
         <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => setOnboarded(false)} />} />
         <Route path="profil" element={<ProfileScreen />} />
         <Route path="profil/avatar" element={<AvatarEditorScreen />} />

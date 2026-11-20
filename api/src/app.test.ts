@@ -481,3 +481,97 @@ test('actus : réponse sans données ni réseau', async () => {
   const n = await buildNews(db, offline)
   assert.deepEqual(n, { releases: [], up: [], down: [], articles: [] })
 })
+
+describe('onglet Vendre : annonces et chat', () => {
+  // Petit « JPEG » valide pour le serveur (commence par FF D8).
+  const jpeg = 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(300, 7)]).toString('base64')
+  const auth = (t: string) => ({ authorization: `Bearer ${t}` })
+  const setPseudo = (t: string, pseudo: string) =>
+    app.inject({ method: 'PUT', url: '/profile', headers: auth(t), payload: { pseudo, avatar: { gender: 'boy' }, updatedAt: new Date().toISOString() } })
+
+  test('publier, chercher, discuter, bloquer, signaler', async () => {
+    const sacha = await login('sacha@example.com')
+    const ondine = await login('ondine@example.com')
+    const ad = { title: 'Dracaufeu ex 151', description: 'Très bon état #rare', hashtags: ['#Dracaufeu', 'ex', 'pas bon!'], kind: 'vente', priceEur: 12, condition: 'NM', photos: [jpeg] }
+
+    // Sans pseudo, on ne peut pas publier.
+    let r = await app.inject({ method: 'POST', url: '/listings', headers: auth(sacha), payload: ad })
+    assert.equal(r.statusCode, 400)
+    assert.equal(r.json().code, 'pseudo')
+    await setPseudo(sacha, 'Sacha')
+    await setPseudo(ondine, 'Ondine')
+
+    r = await app.inject({ method: 'POST', url: '/listings', headers: auth(sacha), payload: { ...ad, photos: [] } })
+    assert.equal(r.statusCode, 400)
+    r = await app.inject({ method: 'POST', url: '/listings', headers: auth(sacha), payload: { ...ad, photos: ['data:image/jpeg;base64,AAAA'] } })
+    assert.equal(r.statusCode, 400)
+    r = await app.inject({ method: 'POST', url: '/listings', headers: auth(sacha), payload: ad })
+    assert.equal(r.statusCode, 200)
+    const id = r.json().id as string
+
+    // Visible par tous, sans email, avec hashtags nettoyés.
+    r = await app.inject({ method: 'GET', url: '/listings' })
+    const list = r.json().listings
+    assert.equal(list.length, 1)
+    assert.deepEqual(list[0].hashtags, ['dracaufeu', 'ex', 'pasbon'])
+    assert.equal(list[0].seller.pseudo, 'Sacha')
+    assert.ok(!JSON.stringify(r.json()).includes('@example.com'))
+    assert.equal((await app.inject({ method: 'GET', url: '/listings?tag=%23dracaufeu' })).json().listings.length, 1)
+    assert.equal((await app.inject({ method: 'GET', url: '/listings?q=dracau' })).json().listings.length, 1)
+    assert.equal((await app.inject({ method: 'GET', url: '/listings?q=pikachu' })).json().listings.length, 0)
+    r = await app.inject({ method: 'GET', url: `/listings/${id}/photos/0` })
+    assert.equal(r.statusCode, 200)
+    assert.equal(r.headers['content-type'], 'image/jpeg')
+
+    // Ondine ne peut pas modifier l'annonce de Sacha.
+    r = await app.inject({ method: 'PUT', url: `/listings/${id}/status`, headers: auth(ondine), payload: { status: 'vendue' } })
+    assert.equal(r.statusCode, 403)
+
+    // Chat : Ondine contacte Sacha.
+    r = await app.inject({ method: 'POST', url: `/listings/${id}/chat`, headers: auth(sacha) })
+    assert.equal(r.statusCode, 400) // pas avec soi-même
+    r = await app.inject({ method: 'POST', url: `/listings/${id}/chat`, headers: auth(ondine) })
+    const chatId = r.json().id as string
+    assert.equal((await app.inject({ method: 'POST', url: `/listings/${id}/chat`, headers: auth(ondine) })).json().id, chatId)
+    // Pas encore de message : Sacha ne voit pas la discussion.
+    assert.equal((await app.inject({ method: 'GET', url: '/chats', headers: auth(sacha) })).json().chats.length, 0)
+    r = await app.inject({ method: 'POST', url: `/chats/${chatId}/messages`, headers: auth(ondine), payload: { body: 'Bonjour, elle est dispo ?' } })
+    assert.equal(r.statusCode, 200)
+    assert.equal((await app.inject({ method: 'GET', url: '/chats/unread', headers: auth(sacha) })).json().count, 1)
+    r = await app.inject({ method: 'GET', url: '/chats', headers: auth(sacha) })
+    assert.equal(r.json().chats[0].other.pseudo, 'Ondine')
+    assert.equal(r.json().chats[0].unread, 1)
+    r = await app.inject({ method: 'GET', url: `/chats/${chatId}`, headers: auth(sacha) })
+    assert.equal(r.json().messages[0].body, 'Bonjour, elle est dispo ?')
+    assert.equal(r.json().messages[0].mine, false)
+    assert.equal((await app.inject({ method: 'GET', url: '/chats/unread', headers: auth(sacha) })).json().count, 0)
+
+    // Un inconnu ne peut pas lire la discussion.
+    const pierre = await login('pierre@example.com')
+    assert.equal((await app.inject({ method: 'GET', url: `/chats/${chatId}`, headers: auth(pierre) })).statusCode, 404)
+
+    // Sacha bloque Ondine : plus de messages, et Ondine ne voit plus ses annonces.
+    await app.inject({ method: 'POST', url: `/users/${r.json().chat.other.id}/block`, headers: auth(sacha) })
+    r = await app.inject({ method: 'POST', url: `/chats/${chatId}/messages`, headers: auth(ondine), payload: { body: 'Allô ?' } })
+    assert.equal(r.statusCode, 403)
+    assert.equal((await app.inject({ method: 'GET', url: '/listings', headers: auth(ondine) })).json().listings.length, 0)
+
+    // Signalement, visible par l'administrateur.
+    r = await app.inject({ method: 'POST', url: `/listings/${id}/report`, headers: auth(pierre), payload: { reason: 'Fausse carte' } })
+    assert.equal(r.statusCode, 200)
+    const admin = await login('admin@example.com')
+    r = await app.inject({ method: 'GET', url: '/admin/reports', headers: auth(admin) })
+    assert.equal(r.json().reports[0].reason, 'Fausse carte')
+    assert.equal((await app.inject({ method: 'GET', url: '/admin/reports', headers: auth(pierre) })).statusCode, 403)
+
+    // Vendue : disparaît du fil mais reste dans « Mes annonces ».
+    await app.inject({ method: 'PUT', url: `/listings/${id}/status`, headers: auth(sacha), payload: { status: 'vendue' } })
+    assert.equal((await app.inject({ method: 'GET', url: '/listings' })).json().listings.length, 0)
+    assert.equal((await app.inject({ method: 'GET', url: '/listings?mine=1', headers: auth(sacha) })).json().listings.length, 1)
+
+    // L'administrateur peut supprimer une annonce.
+    r = await app.inject({ method: 'DELETE', url: `/listings/${id}`, headers: auth(admin) })
+    assert.equal(r.statusCode, 200)
+    assert.equal((await app.inject({ method: 'GET', url: `/listings/${id}` })).statusCode, 404)
+  })
+})

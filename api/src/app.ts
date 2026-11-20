@@ -7,6 +7,7 @@ import type { Mailer } from './lib/mailer.js'
 import { authRoutes } from './routes/auth.js'
 import { cardRoutes } from './routes/cards.js'
 import { collectionRoutes } from './routes/collection.js'
+import { marketRoutes } from './routes/market.js'
 import { statsRoutes } from './routes/stats.js'
 
 /**
@@ -34,6 +35,7 @@ export async function buildApp({ db, config, mailer }: { db: Db; config: Config;
   await app.register(collectionRoutes, { db })
   await app.register(cardRoutes, { db, config })
   await app.register(statsRoutes, { db, config })
+  await app.register(marketRoutes, { db, config })
 
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'erreur')
