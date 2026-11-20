@@ -77,6 +77,7 @@ export function CardScreen() {
 }
 
 function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetail | null; stale: boolean; fetchedAt: number }) {
+  const navigate = useNavigate()
   const [answers, setAnswers] = useState<Answers>({})
   const [toast, setToast] = useState<string | null>(null)
   const [imageKind, setImageKind] = useState<'official' | 'mine' | 'none'>('official')
@@ -325,7 +326,16 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
         >
           <Heart size={22} className={wished ? 'fill-bad text-bad' : 'text-muted'} />
         </button>
-        <button disabled aria-label="Vendre cette carte (bientôt)" title="Bientôt : étape 6" className="grid w-14 place-items-center rounded-2xl border border-line bg-surface text-muted opacity-60 shadow-lg">
+        <button
+          onClick={() =>
+            navigate(
+              `/vendre/nouvelle?${new URLSearchParams({ carte: card.id, nom: card.name, ext: setInfo.name, num: card.localId, prix: ref ? String(ref) : '' })}`,
+            )
+          }
+          aria-label="Vendre cette carte"
+          title="Vendre cette carte"
+          className="grid w-14 place-items-center rounded-2xl border border-line bg-surface text-primary shadow-lg"
+        >
           <Tag size={22} />
         </button>
       </div>

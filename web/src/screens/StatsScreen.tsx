@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Card, ScreenTitle } from '../components/ui'
@@ -117,6 +118,7 @@ export function StatsScreen() {
           <p className="mt-3 text-center text-xs text-muted">
             Les personnes qui ont refusé les statistiques dans Réglages ne sont pas comptées.
           </p>
+          <Reports />
         </>
       )}
     </>
@@ -129,5 +131,55 @@ function Tile({ label, value }: { label: string; value: number }) {
       <p className="text-2xl font-extrabold tabular-nums">{value.toLocaleString('fr-FR')}</p>
       <p className="text-xs text-muted">{label}</p>
     </div>
+  )
+}
+
+interface Report {
+  id: number
+  listingId: string | null
+  title: string | null
+  reason: string
+  pseudo: string | null
+  at: string
+}
+
+/** Annonces signalées par les membres (onglet Vendre). */
+function Reports() {
+  const [reports, setReports] = useState<Report[] | null>(null)
+  useEffect(() => {
+    api<{ reports: Report[] }>('/admin/reports')
+      .then((d) => setReports(d.reports))
+      .catch(() => setReports([]))
+  }, [])
+  if (!reports) return null
+  const dismiss = async (id: number) => {
+    await api(`/admin/reports/${id}`, { method: 'DELETE' })
+    setReports(reports.filter((r) => r.id !== id))
+  }
+  return (
+    <Card className="mt-4">
+      <h2 className="mb-2 font-bold">Signalements ({reports.length})</h2>
+      {reports.length === 0 && <p className="text-sm text-muted">Aucune annonce signalée.</p>}
+      <ul className="divide-y divide-line">
+        {reports.map((r) => (
+          <li key={r.id} className="py-2 text-sm">
+            <p>
+              {r.listingId && r.title ? (
+                <Link to={`/vendre/annonce/${r.listingId}`} className="font-bold text-primary">
+                  {r.title}
+                </Link>
+              ) : (
+                <b>Annonce supprimée</b>
+              )}{' '}
+              <span className="text-muted">· {r.pseudo ?? '?'}</span>
+            </p>
+            <p className="text-muted">« {r.reason} »</p>
+            <button onClick={() => void dismiss(r.id)} className="mt-1 text-xs font-semibold text-muted underline">
+              Traité, retirer de la liste
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }

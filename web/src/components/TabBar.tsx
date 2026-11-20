@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router'
+import { useUnread } from '../lib/market'
 import { BinderIcon, BoosterIcon, CoinIcon, DexIcon, ProfileIcon, RadioIcon } from './TabIcons'
 
 const TABS = [
@@ -12,6 +13,7 @@ const TABS = [
 
 /** Barre d'onglets en bas de l'écran, facile à atteindre avec le pouce. */
 export function TabBar() {
+  const unread = useUnread()
   return (
     <nav
       aria-label="Navigation principale"
@@ -31,11 +33,16 @@ export function TabBar() {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`grid h-9 w-12 place-items-center rounded-full transition-colors ${
+                    className={`relative grid h-9 w-12 place-items-center rounded-full transition-colors ${
                       isActive ? 'bg-primary-soft' : ''
                     }`}
                   >
                     <Icon active={isActive} />
+                    {to === '/vendre' && unread > 0 && (
+                      <span aria-label={`${unread} message(s) non lu(s)`} className="absolute top-0 right-1 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-bad px-1 text-[10px] font-bold text-white ring-2 ring-surface">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
                   </span>
                   {label}
                 </>

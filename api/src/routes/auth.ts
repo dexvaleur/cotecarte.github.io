@@ -137,7 +137,7 @@ export async function authRoutes(app: FastifyInstance, { db, config, mailer }: {
     return { user, isAdmin: adminSet(config).has(user.email) }
   })
 
-  // Profil : pseudo + avatar. Seul l'utilisateur le voit (aucun profil public).
+  // Profil : pseudo + avatar. Visibles par les autres membres seulement sur ses annonces et dans le chat.
   app.get('/profile', async (req, reply) => {
     const user = requireUser(req)
     if (!user) return reply.code(401).send({ error: 'Non connecté.' })

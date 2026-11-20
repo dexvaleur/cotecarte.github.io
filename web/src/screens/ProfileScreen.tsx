@@ -106,6 +106,7 @@ export function ProfileScreen() {
             </button>
           </div>
         )}
+        <p className="mt-1 text-xs text-muted">Ton pseudo et ton avatar s’affichent sur tes annonces et dans le chat de l’onglet Vendre.</p>
         {stats.since && <p className="mt-1 text-sm text-muted">Collectionneur depuis le {formatDate(stats.since)}</p>}
         {!session && <p className="mt-2 text-xs text-muted">Connecte-toi (Collection → Sauvegarde) pour retrouver ton profil sur tous tes appareils.</p>}
       </Card>
