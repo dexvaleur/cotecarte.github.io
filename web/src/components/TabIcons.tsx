@@ -2,7 +2,7 @@ import { AvatarView } from './AvatarView'
 import { useProfile } from '../lib/profile'
 /**
  * Icônes des onglets, dessinées comme des objets d'aventure :
- * Pokédex (scanner), classeur (collection), booster (packs), radio (actus), pièce (vendre).
+ * Pokédex (scanner), classeur (collection), booster (packs et actus), pièce (vendre).
  * Dessins originaux, en couleur. Inactives, elles sont un peu atténuées.
  */
 
@@ -83,24 +83,6 @@ export function BoosterIcon({ active }: IconProps) {
       <path d="M7 7.5h18M7 24.5h18" stroke="#fff" strokeOpacity=".7" strokeWidth="1.2" />
       <path d="M16 10l1.8 4 4.2.4-3.2 2.8 1 4.2-3.8-2.3-3.8 2.3 1-4.2-3.2-2.8 4.2-.4z" fill="#fff" stroke="#8a3fc4" strokeWidth=".9" strokeLinejoin="round" />
       <path d="M9.5 9.5l2 2" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" />
-    </Frame>
-  )
-}
-
-/** Radio verte d'aventurier, antenne et haut-parleur. */
-export function RadioIcon({ active }: IconProps) {
-  return (
-    <Frame active={active}>
-      <path d="M21 10l4-7" stroke="#2c7a3a" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="25" cy="3" r="1.4" fill="#ff5c5c" />
-      <rect x="3.5" y="10" width="25" height="18" rx="4" fill="#3bb35a" stroke="#1f6b31" strokeWidth="1.4" />
-      <circle cx="11" cy="19" r="5.2" fill="#1f6b31" />
-      <circle cx="11" cy="19" r="3.2" fill="#2c8c45" />
-      <circle cx="11" cy="19" r="1.2" fill="#a8ecb8" />
-      <rect x="18.5" y="14" width="7" height="4.5" rx="1" fill="#e8ffe9" stroke="#1f6b31" strokeWidth="1" />
-      <path d="M20 16.2h4" stroke="#3bb35a" strokeWidth="1.1" strokeLinecap="round" />
-      <circle cx="20" cy="23" r="1.3" fill="#ffd23f" />
-      <circle cx="24" cy="23" r="1.3" fill="#ffd23f" />
     </Frame>
   )
 }

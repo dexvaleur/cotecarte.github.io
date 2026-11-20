@@ -1,35 +1,23 @@
 import { ExternalLink, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { CardImage } from '../components/CardThumb'
-import { Card, ScreenTitle } from '../components/ui'
-import { api, API_URL } from '../lib/api'
 import { useCollectionState } from '../lib/collection'
+import { useCallback, useEffect, useState } from 'react'
+import { Card } from '../components/ui'
+import { api, API_URL } from '../lib/api'
 import { formatDate, formatEurCompact } from '../lib/format'
 import { load, save } from '../lib/storage'
 
-/** Onglet Actus : sorties récentes, prix qui bougent, articles, liens utiles. */
+/** Bas de l'onglet Packs : prix de la semaine, derniers articles sur les cartes et sites à suivre. */
 
-interface StarCard {
+interface Mover {
   id: string
   name: string
   localId: string
   image?: string
   eur: number
-}
-
-interface Mover extends StarCard {
   setName: string
   change: number
-}
-
-interface Release {
-  id: string
-  name: string
-  logo?: string
-  releaseDate: string
-  total: number
-  top: StarCard | null
 }
 
 interface Article {
@@ -41,43 +29,31 @@ interface Article {
   image?: string
 }
 
-interface NewsResponse {
-  releases: Release[]
-  up: Mover[]
-  down: Mover[]
-  articles: Article[]
-}
-
 const LINKS = [
   { name: 'Pokécardex', url: 'https://www.pokecardex.com', text: 'Le site français des cartes : actus, spoilers et listes des extensions.' },
   { name: 'Site officiel Pokémon (JCC)', url: 'https://www.pokemon.com/fr/jcc-pokemon', text: 'Annonces officielles des prochaines extensions.' },
   { name: 'Pokébip', url: 'https://www.pokebip.com', text: 'Toute l’actualité Pokémon (jeux, cartes, événements).' },
 ]
 
-function daysAgo(iso: string): string {
-  const d = Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  if (d < 0) return `dans ${-d} jour${d < -1 ? 's' : ''}`
-  if (d === 0) return 'aujourd’hui'
-  if (d < 60) return `il y a ${d} jour${d > 1 ? 's' : ''}`
-  return `il y a ${Math.round(d / 30)} mois`
-}
-
-export function NewsScreen() {
-  const [data, setData] = useState<NewsResponse | null>(() => load<NewsResponse | null>('news', null))
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+export function NewsSection() {
+  const [articles, setArticles] = useState<Article[]>(() => load<Article[]>('newsArticles', []))
+  const [movers, setMovers] = useState<{ up: Mover[]; down: Mover[] }>(() => load('newsMovers', { up: [], down: [] }))
   const { collection, wishlist } = useCollectionState()
   const owned = new Set(collection.map((c) => c.cardId))
   const wished = new Set(wishlist.map((w) => w.cardId))
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const fetchNews = useCallback(async () => {
-    if (!API_URL) return setError('Serveur non configuré.')
+    if (!API_URL) return
     setLoading(true)
     setError(null)
     try {
-      const res = await api<NewsResponse>('/news')
-      setData(res)
-      if (res.releases.length) save('news', res)
+      const res = await api<{ articles: Article[]; up: Mover[]; down: Mover[] }>('/news')
+      setArticles(res.articles)
+      if (res.articles.length) save('newsArticles', res.articles)
+      setMovers({ up: res.up, down: res.down })
+      if (res.up.length || res.down.length) save('newsMovers', { up: res.up, down: res.down })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -89,121 +65,66 @@ export function NewsScreen() {
     void fetchNews()
   }, [fetchNews])
 
-  const empty = !data || (!data.releases.length && !data.up.length && !data.down.length)
-
   return (
     <>
-      <ScreenTitle title="Actus" subtitle="Sorties, prix qui bougent et actualités des cartes" />
+      {(movers.up.length > 0 || movers.down.length > 0) && (
+        <section className="mt-6">
+          <h2 className="text-lg font-extrabold">💶 Prix de la semaine</h2>
+          <p className="mb-2 text-sm text-muted">Prix moyen des 7 derniers jours comparé à celui du mois (Cardmarket, cartes à 5 € ou plus).</p>
+          <Movers title="En hausse" Icon={TrendingUp} tone="text-good" items={movers.up} owned={owned} wished={wished} />
+          <Movers title="En baisse" Icon={TrendingDown} tone="text-bad" items={movers.down} owned={owned} wished={wished} />
+        </section>
+      )}
 
-      {empty && (
+      <h2 className="mt-6 mb-2 text-lg font-extrabold">📰 Articles</h2>
+      {articles.length > 0 ? (
+        <div className="space-y-2">
+          {articles.map((a) => (
+            <a key={a.link} href={a.link} target="_blank" rel="noopener noreferrer" className="flex gap-3 rounded-2xl border border-line bg-surface p-3">
+              {a.image && <img src={a.image} alt="" className="h-16 w-20 shrink-0 rounded-lg object-cover" loading="lazy" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+              <div className="min-w-0">
+                <p className="font-bold">{a.title}</p>
+                <p className="line-clamp-2 text-sm text-muted">{a.summary}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {a.source} · {formatDate(a.date)}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+      ) : (
         <Card>
           {error ? (
             <>
-              <p className="font-semibold">Impossible de charger les actus.</p>
+              <p className="font-semibold">Impossible de charger les articles.</p>
               <p className="text-sm text-muted">{error}</p>
               <button onClick={() => void fetchNews()} className="mt-3 flex items-center gap-2 font-bold text-primary">
                 <RefreshCw size={16} /> Réessayer
               </button>
             </>
           ) : (
-            <p className="text-muted">
-              {loading ? 'Chargement… (le serveur peut mettre jusqu’à 1 minute à se réveiller)' : 'Le serveur prépare les actus. Ouvre l’onglet Packs puis reviens dans 1 minute.'}
-            </p>
+            <p className="text-muted">{loading ? 'Chargement… (le serveur peut mettre jusqu’à 1 minute à se réveiller)' : 'Pas d’article pour le moment.'}</p>
           )}
         </Card>
       )}
+      {error && articles.length > 0 && <p className="mt-2 text-center text-xs text-muted">Hors ligne : derniers articles connus.</p>}
 
-      {data && data.releases.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-lg font-extrabold">🗓️ Sorties récentes</h2>
-          <div className="space-y-2">
-            {data.releases.map((r) => (
-              <Link
-                key={r.id}
-                to={`/collection/extension/${encodeURIComponent(r.id)}`}
-                className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3"
-              >
-                <div className="grid h-10 w-20 shrink-0 place-items-center">
-                  {r.logo && (
-                    <img
-                      src={`${r.logo}.webp`}
-                      alt=""
-                      className="max-h-10 object-contain"
-                      loading="lazy"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold">{r.name}</p>
-                  <p className="text-xs text-muted">
-                    Sortie le {formatDate(r.releaseDate)} · {daysAgo(r.releaseDate)}
-                  </p>
-                  {Date.now() - new Date(r.releaseDate).getTime() < 30 * 86_400_000 ? (
-                    <p className="truncate text-xs">🆕 Toute nouvelle : prix pas encore stables</p>
-                  ) : (
-                    r.top && (
-                      <p className="truncate text-xs">
-                        ⭐ {r.top.name} · <b>{formatEurCompact(r.top.eur)}</b>
-                      </p>
-                    )
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {data && (data.up.length > 0 || data.down.length > 0) && (
-        <section className="mt-6">
-          <h2 className="text-lg font-extrabold">💶 Prix de la semaine</h2>
-          <p className="mb-2 text-sm text-muted">Prix moyen des 7 derniers jours comparé à celui du mois (Cardmarket, cartes à 5 € ou plus).</p>
-          <Movers title="En hausse" Icon={TrendingUp} tone="text-good" items={data.up} owned={owned} wished={wished} />
-          <Movers title="En baisse" Icon={TrendingDown} tone="text-bad" items={data.down} owned={owned} wished={wished} />
-        </section>
-      )}
-
-      {data && data.articles.length > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-2 text-lg font-extrabold">📰 Articles</h2>
-          <div className="space-y-2">
-            {data.articles.map((a) => (
-              <a key={a.link} href={a.link} target="_blank" rel="noopener noreferrer" className="flex gap-3 rounded-2xl border border-line bg-surface p-3">
-                {a.image && <img src={a.image} alt="" className="h-16 w-20 shrink-0 rounded-lg object-cover" loading="lazy" />}
-                <div className="min-w-0">
-                  <p className="font-bold">{a.title}</p>
-                  <p className="line-clamp-2 text-sm text-muted">{a.summary}</p>
-                  <p className="mt-1 text-xs text-muted">
-                    {a.source} · {formatDate(a.date)}
-                  </p>
-                </div>
+      <h2 className="mt-6 mb-2 text-lg font-extrabold">🔗 Sources : suivre l’actualité des cartes</h2>
+      <Card>
+        <ul className="space-y-3">
+          {LINKS.map((l) => (
+            <li key={l.url}>
+              <a href={l.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2">
+                <ExternalLink size={18} className="mt-0.5 shrink-0 text-primary" />
+                <span>
+                  <b>{l.name}</b>
+                  <span className="block text-sm text-muted">{l.text}</span>
+                </span>
               </a>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mt-6">
-        <h2 className="mb-2 text-lg font-extrabold">🔗 Suivre l’actualité des cartes</h2>
-        <Card>
-          <ul className="space-y-3">
-            {LINKS.map((l) => (
-              <li key={l.url}>
-                <a href={l.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2">
-                  <ExternalLink size={18} className="mt-0.5 shrink-0 text-primary" />
-                  <span>
-                    <b>{l.name}</b>
-                    <span className="block text-sm text-muted">{l.text}</span>
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </section>
-
-      {error && !empty && <p className="mt-4 text-center text-xs text-muted">Hors ligne : dernières actus connues.</p>}
+            </li>
+          ))}
+        </ul>
+      </Card>
     </>
   )
 }

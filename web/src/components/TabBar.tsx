@@ -1,12 +1,11 @@
 import { NavLink } from 'react-router'
 import { useUnread } from '../lib/market'
-import { BinderIcon, BoosterIcon, CoinIcon, DexIcon, ProfileIcon, RadioIcon } from './TabIcons'
+import { BinderIcon, BoosterIcon, CoinIcon, DexIcon, ProfileIcon } from './TabIcons'
 
 const TABS = [
   { to: '/scanner', label: 'Scanner', Icon: DexIcon },
   { to: '/collection', label: 'Collection', Icon: BinderIcon },
   { to: '/packs', label: 'Packs', Icon: BoosterIcon },
-  { to: '/actus', label: 'Actus', Icon: RadioIcon },
   { to: '/vendre', label: 'Vendre', Icon: CoinIcon },
   { to: '/profil', label: 'Profil', Icon: ProfileIcon },
 ]
