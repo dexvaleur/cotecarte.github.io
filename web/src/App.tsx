@@ -9,7 +9,6 @@ import { load, save } from './lib/storage'
 import { CollectionScreen } from './screens/CollectionScreen'
 import { GlossaryScreen } from './screens/GlossaryScreen'
 import { LegalScreen } from './screens/LegalScreen'
-import { NewsScreen } from './screens/NewsScreen'
 import { Onboarding } from './screens/Onboarding'
 import { PacksScreen } from './screens/PacksScreen'
 import { AvatarEditorScreen, ProfileScreen } from './screens/ProfileScreen'
@@ -43,7 +42,7 @@ export default function App() {
         <Route path="scanner" element={<ScannerScreen />} />
         <Route path="collection" element={<CollectionScreen />} />
         <Route path="packs" element={<PacksScreen />} />
-        <Route path="actus" element={<NewsScreen />} />
+        <Route path="actus" element={<Navigate to="/packs" replace />} />
         <Route path="vendre" element={<SellScreen />} />
         <Route path="vendre/nouvelle" element={<ListingFormScreen />} />
         <Route path="vendre/annonce/:id" element={<ListingScreen />} />

@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
+import { NewsSection } from './NewsScreen'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { CardImage } from '../components/CardThumb'
@@ -189,6 +190,8 @@ export function PacksScreen() {
 
       <h2 className="mt-6 mb-2 text-lg font-extrabold">Extensions récentes</h2>
       <RecentSets />
+
+      <NewsSection />
     </>
   )
 }
