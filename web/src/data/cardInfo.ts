@@ -100,6 +100,7 @@ const EN_TO_FR: Record<string, string> = {
   darkness: 'Obscurité', metal: 'Métal', fairy: 'Fée', dragon: 'Dragon', colorless: 'Incolore',
   pokemon: 'Pokémon', trainer: 'Dresseur', energy: 'Énergie',
   basic: 'De base', stage1: 'Niveau 1', stage2: 'Niveau 2', vmax: 'VMAX', vstar: 'VSTAR', mega: 'Méga',
+  ability: 'Talent', item: 'Objet', supporter: 'Supporter', stadium: 'Stade', tool: 'Outil Pokémon',
 }
 
 /** « Fire » → « Feu », « Stage2 » → « Niveau 2 » ; un mot déjà en français reste tel quel. */

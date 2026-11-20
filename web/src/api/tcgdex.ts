@@ -52,16 +52,19 @@ export async function getSets(lang: Lang = 'fr'): Promise<SetBrief[]> {
 export async function getSet(id: string, lang: Lang = 'fr'): Promise<Cached<SetDetail>> {
   const { lang: asian, raw } = splitCardId(id)
   if (!asian) return get<SetDetail>(`/${lang}/sets/${encodeURIComponent(id)}`, DAY)
-  const res = await get<SetDetail>(`/${asian}/sets/${encodeURIComponent(raw)}`, DAY)
-  return { ...res, data: { ...res.data, id, cards: res.data.cards.map((c) => ({ ...c, id: withLang(asian, c.id) })) } }
+  const [res, { frenchBriefs }] = await Promise.all([get<SetDetail>(`/${asian}/sets/${encodeURIComponent(raw)}`, DAY), import('./frenchify')])
+  const cards = frenchBriefs(res.data.cards.map((c) => ({ ...c, id: withLang(asian, c.id) })))
+  return { ...res, data: { ...res.data, id, cards } }
 }
 
 /** Fiche complète d'une carte : en français si elle existe, sinon en anglais. */
 export async function getCard(id: string): Promise<Cached<Card>> {
   const { lang: asian, raw } = splitCardId(id)
   if (asian) {
-    const res = await get<Omit<Card, 'lang'>>(`/${asian}/cards/${encodeURIComponent(raw)}`, 6 * HOUR)
-    return { ...res, data: { ...res.data, id, lang: asian } }
+    const [res, { frenchify }] = await Promise.all([get<Omit<Card, 'lang'>>(`/${asian}/cards/${encodeURIComponent(raw)}`, 6 * HOUR), import('./frenchify')])
+    // Textes en français : on cherche la même carte en version française (voir frenchify.ts).
+    const data = await frenchify({ ...res.data, id, lang: asian }, async (path) => (await get(path, 7 * DAY)).data as never)
+    return { ...res, data }
   }
   try {
     const res = await get<Omit<Card, 'lang'>>(`/fr/cards/${encodeURIComponent(id)}`, 6 * HOUR)

@@ -103,6 +103,10 @@ export interface Card {
   pricing?: { cardmarket?: CardmarketPrices | null; tcgplayer?: TcgplayerPrices | null }
   /** Langue dans laquelle la fiche a été trouvée (ajouté par l'appli) */
   lang: Lang
+  /** Cartes asiatiques : nom imprimé sur la carte (ajouté par l'appli) */
+  originalName?: string
+  /** Cartes asiatiques : attaques et talents traduits depuis la version française (ajouté par l'appli) */
+  textsInFrench?: boolean
 }
 
 /** Réponse enrichie par le cache : on sait si la donnée est « périmée » (vue hors ligne). */
