@@ -14,7 +14,7 @@ import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from 
 import { PriceChart } from '../components/PriceChart'
 import { Card as Box } from '../components/ui'
 import { CONDITIONS, frLabel, generationOf, rarityInfo, typeColor } from '../data/cardInfo'
-import { LANG_NAMES } from '../api/cardId'
+import { ASIAN_SERIES_FR, LANG_NAMES, splitCardId } from '../api/cardId'
 import { addToCollection, toggleWish, useCollectionState } from '../lib/collection'
 import { formatDate, formatEur, formatEurCompact, formatUsd, timeAgo } from '../lib/format'
 import { cardmarketRows, change30d, chartPoints, type PriceRow, refPriceEur, tcgplayerRows } from '../lib/prices'
@@ -88,10 +88,17 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
   const wished = wishlist.some((w) => w.cardId === card.id)
 
   const rarity = rarityInfo(card.rarity)
+  const isPokemon = frLabel(card.category ?? '') === 'Pokémon'
   const ref = refPriceEur(card)
   const grade = gradeFromAnswers(answers)
   const gen = generationOf(card.dexId?.[0])
   const setInfo = set ?? card.set
+  // Extension asiatique : son code (« SV2a ») et la série en français, le nom d'origine en plus.
+  const asianSet = splitCardId(setInfo.id).lang ? splitCardId(setInfo.id).raw : null
+  const serieName = set?.serie ? (asianSet ? (ASIAN_SERIES_FR[set.serie.id] ?? set.serie.name) : set.serie.name) : null
+  const setLabel = asianSet
+    ? `${asianSet}${serieName ? `, série ${serieName}` : ''} (${setInfo.name})`
+    : `${setInfo.name}${serieName ? ` (${serieName})` : ''}`
 
   // La première fois qu'on ouvre une fiche, Dexy explique les infos de la carte.
   useEffect(() => {
@@ -190,8 +197,13 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
           <p className="text-sm text-muted">
             {card.category && frLabel(card.category)}
             {card.stage ? ` · ${frLabel(card.stage)}` : ''}
-            {card.lang !== 'fr' && ` · fiche en ${LANG_NAMES[card.lang] ?? card.lang}`}
+            {card.lang === 'en' && ' · fiche en anglais'}
           </p>
+          {card.originalName && (
+            <p className="text-sm text-muted">
+              Carte en {LANG_NAMES[card.lang] ?? card.lang} : <span lang={card.lang}>{card.originalName}</span>
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {card.types?.map((t) => <TypeChip key={t} type={t} />)}
             {card.hp && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-bold">{card.hp} PV</span>}
@@ -258,7 +270,7 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
         <h2 className="mb-2 font-bold">Infos de la carte</h2>
         {setInfo.logo && <img src={`${setInfo.logo}.webp`} alt="" className="mb-2 h-10 object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-          <Info label="Extension" value={`${setInfo.name}${set?.serie ? ` (${set.serie.name})` : ''}`} />
+          <Info label="Extension" value={setLabel} />
           <Info label="Numéro" value={`${card.localId} / ${setInfo.cardCount.official}`} />
           <Info label="Sortie" value={formatDate(set?.releaseDate)} />
           {gen && <Info label="Génération" value={`${gen}ᵉ génération (Pokédex n° ${card.dexId?.[0]})`} />}
@@ -271,13 +283,13 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       {/* Jeu */}
       {(card.attacks?.length || card.abilities?.length || card.effect) && (
         <Box>
-          <h2 className="mb-2 font-bold">{card.category === 'Pokémon' ? 'Attaques et talents' : 'Effet'}</h2>
+          <h2 className="mb-2 font-bold">{isPokemon ? 'Attaques et talents' : 'Effet'}</h2>
           {card.effect && <p className="text-sm">{card.effect}</p>}
           <ul className="space-y-3">
             {card.abilities?.map((a) => (
               <li key={a.name}>
                 <p className="font-bold">
-                  <span className="mr-1 rounded bg-bad px-1.5 py-0.5 text-[10px] text-white uppercase">{a.type ?? 'Talent'}</span>
+                  <span className="mr-1 rounded bg-bad px-1.5 py-0.5 text-[10px] text-white uppercase">{a.type ? frLabel(a.type) : 'Talent'}</span>
                   {a.name}
                 </p>
                 {a.effect && <p className="text-sm text-muted">{a.effect}</p>}
@@ -298,15 +310,20 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
               </li>
             ))}
           </ul>
-          {card.category === 'Pokémon' && (
+          {card.originalName && !card.textsInFrench ? (
+            <p className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">
+              Version française de cette carte introuvable : son texte reste dans la langue d’origine.
+            </p>
+          ) : null}
+          {isPokemon && (
             <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center text-sm">
               <div>
                 <dt className="text-xs text-muted">Faiblesse</dt>
-                <dd className="font-bold">{card.weaknesses?.map((w) => `${w.type} ${w.value ?? ''}`).join(', ') || '—'}</dd>
+                <dd className="font-bold">{card.weaknesses?.map((w) => `${frLabel(w.type)} ${w.value ?? ''}`).join(', ') || '—'}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted">Résistance</dt>
-                <dd className="font-bold">{card.resistances?.map((w) => `${w.type} ${w.value ?? ''}`).join(', ') || '—'}</dd>
+                <dd className="font-bold">{card.resistances?.map((w) => `${frLabel(w.type)} ${w.value ?? ''}`).join(', ') || '—'}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted">Retraite</dt>

@@ -32,3 +32,22 @@ export const LANG_NAMES: Record<string, string> = {
   th: 'thaï',
   id: 'indonésien',
 }
+
+/** Séries japonaises (identifiants TCGdex) → nom de la série en France. */
+export const ASIAN_SERIES_FR: Record<string, string> = {
+  PMCG: 'Set de base (années 1990)',
+  neo: 'Neo',
+  VS: 'VS',
+  web: 'Web',
+  e: 'e-Card',
+  ADV: 'EX',
+  PCG: 'EX',
+  L: 'HeartGold SoulSilver',
+  BW: 'Noir et Blanc',
+  XY: 'XY',
+  XYb: 'XY',
+  SM: 'Soleil et Lune',
+  S: 'Épée et Bouclier',
+  M: 'Méga-Évolution',
+  SV: 'Écarlate et Violet',
+}
