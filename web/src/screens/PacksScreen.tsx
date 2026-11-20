@@ -137,7 +137,7 @@ export function PacksScreen() {
     <>
       <ScreenTitle title="Packs" subtitle="Quoi acheter, et dans quelle extension ?" />
 
-      <Card>
+      <Card data-tour="packs-products">
         <button onClick={() => setShowProducts(!showProducts)} className="flex w-full items-center justify-between text-left">
           <h2 className="font-bold">Booster, coffret, display : c’est quoi ?</h2>
           <ChevronDown size={20} className={`shrink-0 transition ${showProducts ? 'rotate-180' : ''}`} />
@@ -164,7 +164,7 @@ export function PacksScreen() {
         )}
       </Card>
 
-      <Card className="mt-4">
+      <Card className="mt-4" data-tour="packs-goal">
         <h2 className="mb-3 font-bold">Ton objectif</h2>
         <div role="radiogroup" aria-label="Objectif" className="flex flex-wrap gap-2">
           {GOALS.map((g) => (
@@ -188,7 +188,9 @@ export function PacksScreen() {
 
       <WhereToBuy />
 
-      <h2 className="mt-6 mb-2 text-lg font-extrabold">Extensions récentes</h2>
+      <h2 className="mt-6 mb-2 text-lg font-extrabold" data-tour="packs-sets">
+        Extensions récentes
+      </h2>
       <RecentSets />
 
       <NewsSection />
@@ -243,7 +245,7 @@ function WhereToBuy() {
   const [tab, setTab] = useState<(typeof WHERE)[number]['id']>('shops')
   const w = WHERE.find((x) => x.id === tab)!
   return (
-    <Card className="mt-4">
+    <Card className="mt-4" data-tour="packs-where">
       <h2 className="mb-3 font-bold">Où acheter ?</h2>
       <div role="radiogroup" aria-label="Où acheter" className="flex flex-wrap gap-2">
         {WHERE.map((x) => (

@@ -1,15 +1,14 @@
-import { useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { useEffect } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AppShell } from './components/AppShell'
 import { CardScreen } from './screens/CardScreen'
 import { BinderScreen, NewBinderScreen } from './screens/Binders'
 import { SearchScreen } from './screens/SearchScreen'
 import { SetScreen } from './screens/SetScreen'
-import { load, save } from './lib/storage'
+import { sectionFor, startTour, tourSeen } from './lib/tour'
 import { CollectionScreen } from './screens/CollectionScreen'
 import { GlossaryScreen } from './screens/GlossaryScreen'
 import { LegalScreen } from './screens/LegalScreen'
-import { Onboarding } from './screens/Onboarding'
 import { PacksScreen } from './screens/PacksScreen'
 import { AvatarEditorScreen, ProfileScreen } from './screens/ProfileScreen'
 import { ScannerScreen } from './screens/ScannerScreen'
@@ -21,19 +20,18 @@ import { SettingsScreen } from './screens/SettingsScreen'
 import { StatsScreen } from './screens/StatsScreen'
 
 export default function App() {
-  // Au premier lancement, on montre l'onboarding. Ensuite on s'en souvient.
-  const [onboarded, setOnboarded] = useState(() => load('onboarded', false))
-
-  if (!onboarded) {
-    return (
-      <Onboarding
-        onDone={() => {
-          save('onboarded', true)
-          setOnboarded(true)
-        }}
-      />
-    )
-  }
+  // Au premier lancement, Dexy fait visiter l'appli. Ensuite on s'en souvient.
+  // Pas si on arrive par un lien vers une annonce ou une carte : on laisse la personne la voir.
+  const { pathname } = useLocation()
+  useEffect(() => {
+    const s = sectionFor(pathname)
+    if (!tourSeen('all') && (pathname === '/' || (s && s !== 'carte'))) {
+      const t = setTimeout(() => startTour('all'), 400)
+      return () => clearTimeout(t)
+    }
+    // Uniquement à l'ouverture de l'appli.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <Routes>
@@ -48,7 +46,7 @@ export default function App() {
         <Route path="vendre/annonce/:id" element={<ListingScreen />} />
         <Route path="vendre/annonce/:id/modifier" element={<ListingFormScreen />} />
         <Route path="vendre/chat/:id" element={<ChatScreen />} />
-        <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => setOnboarded(false)} />} />
+        <Route path="reglages" element={<SettingsScreen onReplayOnboarding={() => startTour('all')} />} />
         <Route path="profil" element={<ProfileScreen />} />
         <Route path="profil/avatar" element={<AvatarEditorScreen />} />
         <Route path="glossaire" element={<GlossaryScreen />} />

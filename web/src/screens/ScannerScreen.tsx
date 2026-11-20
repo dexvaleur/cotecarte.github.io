@@ -226,6 +226,7 @@ function Idle({
       <ScreenTitle title="Scanner une carte" subtitle="Photographie ta carte, on s'occupe du reste." />
       <button
         onClick={onCamera}
+        data-tour="scan-button"
         className="relative mx-auto block aspect-[63/88] w-3/5 max-w-[15rem] rounded-3xl bg-gradient-to-br from-primary to-[#b24cf5] p-1 shadow-lg active:scale-[.98]"
       >
         <div className="grid h-full w-full place-items-center rounded-[1.3rem] border-2 border-dashed border-white/70 bg-black/10 text-center text-white">
@@ -237,7 +238,7 @@ function Idle({
         </div>
       </button>
 
-      <label className="mx-auto mt-4 flex max-w-xs items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-1.5 text-sm">
+      <label data-tour="scan-lang" className="mx-auto mt-4 flex max-w-xs items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-1.5 text-sm">
         <span className="shrink-0 font-semibold text-muted">Cartes :</span>
         <select
           value={lang}
@@ -266,7 +267,7 @@ function Idle({
         <button onClick={onCamera} className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-lg font-bold text-primary-ink active:scale-[.98]">
           <Camera size={22} /> Ouvrir la caméra
         </button>
-        <div className="grid grid-cols-2 gap-3">
+        <div data-tour="scan-other" className="grid grid-cols-2 gap-3">
           <button onClick={onFile} className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-surface py-3 font-semibold">
             <ImageUp size={20} /> Galerie
           </button>
@@ -390,7 +391,7 @@ const TIPS: { emoji: string; title: string; text: string }[] = [
 function ScanTips() {
   const [open, setOpen] = useState(() => !load('scanTipsSeen', false))
   return (
-    <section className="mt-6 overflow-hidden rounded-3xl border border-line bg-surface">
+    <section data-tour="scan-tips" className="mt-6 overflow-hidden rounded-3xl border border-line bg-surface">
       <button
         onClick={() => {
           setOpen(!open)

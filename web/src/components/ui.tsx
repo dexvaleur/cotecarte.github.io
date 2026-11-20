@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 
 // Petits composants réutilisables pour garder un style cohérent partout.
 
@@ -11,8 +11,12 @@ export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: str
   )
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-3xl border border-line bg-surface p-4 ${className}`}>{children}</section>
+export function Card({ children, className = '', ...rest }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLElement>) {
+  return (
+    <section {...rest} className={`rounded-3xl border border-line bg-surface p-4 ${className}`}>
+      {children}
+    </section>
+  )
 }
 
 export function Badge({ children, tone = 'primary' }: { children: ReactNode; tone?: 'primary' | 'accent' }) {
