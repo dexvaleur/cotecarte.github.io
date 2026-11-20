@@ -1,5 +1,5 @@
 import { trackScan } from '../lib/stats'
-import { Camera, ImageUp, RotateCcw, Search, Sparkles } from 'lucide-react'
+import { Camera, ChevronDown, ImageUp, Lightbulb, RotateCcw, Search, Sparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { rememberScanPhoto } from '../lib/myPhotos'
@@ -9,7 +9,7 @@ import { CameraCapture } from '../components/CameraCapture'
 import { CardThumb, useSetNames } from '../components/CardThumb'
 import { Card, ScreenTitle } from '../components/ui'
 import { useOnline } from '../lib/useOnline'
-import { canvasToDataUrl, cropToCard, fileToCanvas, findCard } from '../scan/image'
+import { canvasToDataUrl, cropToCard, fileToCanvas, findCard, findSleevedCard, glareRatio, looksSleeved } from '../scan/image'
 import { OcrLoadError, warmUpOcr } from '../scan/ocr'
 import { load, save } from '../lib/storage'
 import { type Recognition, recognizeCard, type ScanLang } from '../scan/recognize'
@@ -18,8 +18,14 @@ type Phase =
   | { name: 'idle' }
   | { name: 'camera' }
   | { name: 'analyzing'; preview: string; step: string }
-  | { name: 'results'; preview: string; rec: Recognition }
+  | { name: 'results'; preview: string; rec: Recognition; issues: Issues }
   | { name: 'error'; preview?: string; message: string; detail?: string }
+
+/** Ce qui a pu gêner la lecture de la photo (pour donner le bon conseil). */
+interface Issues {
+  sleeve: boolean
+  glare: boolean
+}
 
 // On garde le dernier résultat en mémoire : en revenant de la fiche, la liste est toujours là.
 let lastPhase: Phase = { name: 'idle' }
@@ -57,8 +63,11 @@ export function ScannerScreen() {
    * attempts : une ou plusieurs images de la même carte (rafale caméra), de la plus nette
    * à la moins nette. Si la 1re ne suffit pas, on essaie la suivante et on combine.
    */
-  async function analyze(attempts: HTMLCanvasElement[][]) {
+  async function analyze(attempts: HTMLCanvasElement[][], source: HTMLCanvasElement) {
     const preview = canvasToDataUrl(attempts[0][0])
+    // Carte dans une protection rigide : on prépare aussi un recadrage sur la carte elle-même.
+    const sleeved = findSleevedCard(source, attempts[0].length === 1)
+    const issues: Issues = { sleeve: !!sleeved || looksSleeved(source), glare: glareRatio(attempts[0][0]) > 0.03 }
     setPhase({ name: 'analyzing', preview, step: 'Préparation…' })
     try {
       const onProgress = (p: { status: string }) => {
@@ -72,13 +81,20 @@ export function ScannerScreen() {
         const other = await recognizeCard(views, onProgress, lang).catch(() => null)
         if (other) rec = mergeRecognitions(rec, other)
       }
+      if (!rec.confident && sleeved) {
+        setPhaseState((cur) => (cur.name === 'analyzing' ? { ...cur, step: 'Carte dans une protection : on regarde de plus près…' } : cur))
+        const other = await recognizeCard(sleeved, onProgress, lang).catch(() => null)
+        if (other) rec = mergeRecognitions(rec, other)
+      }
+      // Diagnostic : liste finale proposée (après les essais combinés).
+      ;(globalThis as Record<string, unknown>).__pokecardFinal = rec.candidates.map((c) => c.id)
       trackScan()
       rememberScanPhoto(rec.preview, rec.confident ? rec.candidates[0]?.id : undefined, `${rec.readName ?? '?'} · ${rec.readNumber ? `${rec.readNumber.raw}/${rec.readNumber.total ?? '?'}` : '?'}`)
       if (rec.confident) {
-        setPhase({ name: 'results', preview: rec.preview, rec })
+        setPhase({ name: 'results', preview: rec.preview, rec, issues })
         navigate(`/carte/${encodeURIComponent(rec.candidates[0].id)}`)
       } else {
-        setPhase({ name: 'results', preview: rec.preview, rec })
+        setPhase({ name: 'results', preview: rec.preview, rec, issues })
       }
     } catch (e) {
       setPhase({
@@ -104,7 +120,7 @@ export function ScannerScreen() {
     try {
       const canvas = await fileToCanvas(file)
       // On cherche la carte dans la photo ; sinon on recadre simplement au centre.
-      await analyze([findCard(canvas) ?? [cropToCard(canvas)]])
+      await analyze([findCard(canvas) ?? [cropToCard(canvas)]], canvas)
     } catch {
       setPhase({ name: 'error', message: 'Impossible d’ouvrir cette image. Essaie une photo JPEG ou PNG.' })
     }
@@ -126,7 +142,12 @@ export function ScannerScreen() {
           // Si la carte ne remplit pas tout le cadre, on affine le recadrage.
           // Carte cherchée dans la capture élargie ; elle doit occuper l'essentiel du cadre
           // (sinon on a sans doute trouvé l'illustration) : à défaut, on prend le cadre tel quel.
-          onCapture={(shots) => void analyze(shots.map((s) => findCard(s.wide, 0.6, true, 0.25) ?? [s.framed]))}
+          onCapture={(shots) =>
+            void analyze(
+              shots.map((s) => findCard(s.wide, 0.6, true, 0.25) ?? [s.framed]),
+              shots[0].wide,
+            )
+          }
         />
       )}
 
@@ -161,6 +182,7 @@ export function ScannerScreen() {
         <Results
           preview={phase.preview}
           rec={phase.rec}
+          issues={phase.issues}
           onRetry={() => setPhase({ name: 'camera' })}
           onReset={() => setPhase({ name: 'idle' })}
         />
@@ -253,11 +275,13 @@ function Idle({
           </Link>
         </div>
       </div>
+
+      <ScanTips />
     </>
   )
 }
 
-function Results({ preview, rec, onRetry, onReset }: { preview: string; rec: Recognition; onRetry: () => void; onReset: () => void }) {
+function Results({ preview, rec, issues, onRetry, onReset }: { preview: string; rec: Recognition; issues?: Issues; onRetry: () => void; onReset: () => void }) {
   const setNames = useSetNames()
   const read = [rec.readName, rec.readNumber ? `n° ${rec.readNumber.raw}${rec.readNumber.total ? '/' + rec.readNumber.total : ''}` : null]
     .filter(Boolean)
@@ -330,15 +354,10 @@ function Results({ preview, rec, onRetry, onReset }: { preview: string; rec: Rec
           </div>
         </>
       ) : (
-        <Card>
-          <p className="font-bold">Quelques conseils pour réessayer :</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
-            <li>Place la carte entière dans le cadre, bien droite.</li>
-            <li>Évite les reflets : penche légèrement la carte ou éteins le flash.</li>
-            <li>Une sleeve brillante peut gêner : sors la carte si possible.</li>
-          </ul>
-        </Card>
+        <p className="text-muted">Le scanner n’a trouvé aucune carte. Reprends la photo en suivant ces conseils.</p>
       )}
+
+      <ScanAdvice rec={rec} issues={issues} />
 
       <div className="mt-5 grid gap-2">
         <button onClick={onRetry} className="rounded-2xl bg-primary py-3 font-bold text-primary-ink">
@@ -354,5 +373,83 @@ function Results({ preview, rec, onRetry, onReset }: { preview: string; rec: Rec
         </p>
       )}
     </>
+  )
+}
+
+/** Les règles d'un bon scan, dans l'ordre d'importance. */
+const TIPS: { emoji: string; title: string; text: string }[] = [
+  { emoji: '✨', title: 'Pas de reflet', text: 'Une tache blanche sur le nom ou le numéro suffit à tout rater. Incline un peu la carte ou le téléphone, et évite le flash et les lampes juste au-dessus.' },
+  { emoji: '🛡️', title: 'Sors la carte de sa protection', text: 'Les toploaders et les sleeves brillantes font des reflets et cachent les bords. Si tu ne peux pas, pose-la bien à plat.' },
+  { emoji: '🖤', title: 'Sur un fond uni et foncé', text: 'Table, tapis ou feuille sombre : la carte ressort mieux qu’au milieu d’autres objets.' },
+  { emoji: '📐', title: 'Toute la carte, bien droite', text: 'Les 4 coins dans le cadre, le téléphone parallèle à la carte (pas de biais).' },
+  { emoji: '🔢', title: 'Le numéro bien visible', text: 'Le petit numéro en bas (ex. 190/167) permet de trouver la bonne version : il doit être net.' },
+  { emoji: '💡', title: 'De la lumière', text: 'Une pièce bien éclairée, ou près d’une fenêtre. Ne bouge pas pendant la photo.' },
+]
+
+/** Conseils sur l'écran d'accueil du scanner (repliables). */
+function ScanTips() {
+  const [open, setOpen] = useState(() => !load('scanTipsSeen', false))
+  return (
+    <section className="mt-6 overflow-hidden rounded-3xl border border-line bg-surface">
+      <button
+        onClick={() => {
+          setOpen(!open)
+          save('scanTipsSeen', true)
+        }}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left font-bold"
+      >
+        <Lightbulb size={20} className="text-accent" /> Les règles d’un scan parfait
+        <ChevronDown size={18} className={`ml-auto text-muted transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <ul className="space-y-3 px-4 pb-4">
+          {TIPS.map((t) => (
+            <li key={t.title} className="flex gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary-soft text-lg" aria-hidden>
+                {t.emoji}
+              </span>
+              <div>
+                <p className="font-semibold">{t.title}</p>
+                <p className="text-sm text-muted">{t.text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/** Après un scan incertain : les conseils qui correspondent à ce qui a gêné, en premier. */
+function ScanAdvice({ rec, issues }: { rec: Recognition; issues?: Issues }) {
+  if (rec.confident) return null
+  const found: { emoji: string; text: string }[] = []
+  if (issues?.sleeve) found.push({ emoji: '🛡️', text: 'Ta carte semble être dans une protection rigide : sors-la pour la scanner, c’est beaucoup plus fiable.' })
+  if (issues?.glare) found.push({ emoji: '✨', text: 'Il y a un reflet sur la photo : incline un peu la carte ou le téléphone, et coupe le flash.' })
+  if (!rec.readNumber) found.push({ emoji: '🔢', text: 'Le numéro en bas de la carte n’a pas pu être lu : rapproche-toi un peu, avec plus de lumière.' })
+  if (!rec.readName) found.push({ emoji: '🔤', text: 'Le nom n’a pas pu être lu : vérifie que le haut de la carte est net et sans reflet.' })
+  const rest = TIPS.filter((t) => !found.some((f) => f.emoji === t.emoji)).slice(0, Math.max(0, 3 - found.length))
+  return (
+    <Card className="mt-5">
+      <p className="flex items-center gap-2 font-bold">
+        <Lightbulb size={18} className="text-accent" /> {found.length ? 'Ce qui a gêné le scanner' : 'Pour que ça marche du premier coup'}
+      </p>
+      <ul className="mt-2 space-y-2 text-sm">
+        {found.map((f) => (
+          <li key={f.text} className="flex gap-2 rounded-xl bg-warn/10 px-2.5 py-2 font-semibold">
+            <span aria-hidden>{f.emoji}</span> {f.text}
+          </li>
+        ))}
+        {rest.map((t) => (
+          <li key={t.title} className="flex gap-2 px-2.5 text-muted">
+            <span aria-hidden>{t.emoji}</span>
+            <span>
+              <b className="text-ink">{t.title}</b> : {t.text}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }

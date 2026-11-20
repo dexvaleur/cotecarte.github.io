@@ -1,6 +1,6 @@
 import { ImageUp, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { CARD_RATIO, makeCanvas, sharpness } from '../scan/image'
+import { CARD_RATIO, glareRatio, makeCanvas, sharpness } from '../scan/image'
 
 /**
  * Caméra plein écran avec un cadre au format carte.
@@ -36,6 +36,7 @@ export function CameraCapture({
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [glare, setGlare] = useState(false)
 
   useEffect(() => {
     let stream: MediaStream | null = null
@@ -80,6 +81,35 @@ export function CameraCapture({
       stream?.getTracks().forEach((t) => t.stop())
     }
   }, [])
+
+  // Reflet en direct : deux fois par seconde, on regarde si une zone du cadre est « brûlée ».
+  useEffect(() => {
+    if (!ready) return
+    let streak = 0
+    const t = setInterval(() => {
+      const r = frameRect()
+      const v = videoRef.current
+      if (!r || !v) return
+      const c = makeCanvas(90, 90 / CARD_RATIO)
+      c.getContext('2d')!.drawImage(v, r.sx, r.sy, r.sw, r.sh, 0, 0, c.width, c.height)
+      // Deux mesures de suite au-dessus du seuil : évite que l'alerte clignote.
+      streak = glareRatio(c) > 0.03 ? streak + 1 : 0
+      setGlare(streak >= 2)
+    }, 500)
+    return () => clearInterval(t)
+  }, [ready])
+
+  /** Position du cadre dans l'image réelle de la vidéo (affichée en « cover »). */
+  function frameRect() {
+    const v = videoRef.current
+    const box = boxRef.current?.getBoundingClientRect()
+    const frame = frameRef.current?.getBoundingClientRect()
+    if (!v || !box || !frame || !v.videoWidth) return null
+    const scale = Math.max(box.width / v.videoWidth, box.height / v.videoHeight)
+    const ox = (box.width - v.videoWidth * scale) / 2
+    const oy = (box.height - v.videoHeight * scale) / 2
+    return { sx: (frame.left - box.left - ox) / scale, sy: (frame.top - box.top - oy) / scale, sw: frame.width / scale, sh: frame.height / scale }
+  }
 
   /** Une image de la vidéo : le cadre seul, et le cadre avec une marge. */
   function grab(): Shot | null {
@@ -158,8 +188,8 @@ export function CameraCapture({
         <button onClick={onClose} aria-label="Fermer la caméra" className="grid h-11 w-11 place-items-center rounded-full bg-black/50">
           <X />
         </button>
-        <p className="rounded-full bg-black/50 px-3 py-1.5 text-sm font-semibold">
-          {busy ? 'Ne bouge pas…' : ready ? 'Cadre toute la carte, sans reflet' : 'Ouverture de la caméra…'}
+        <p className={`rounded-full px-3 py-1.5 text-center text-sm font-semibold transition-colors ${glare && !busy ? 'bg-warn text-white' : 'bg-black/50'}`} role="status">
+          {busy ? 'Ne bouge pas…' : !ready ? 'Ouverture de la caméra…' : glare ? '⚠️ Reflet ! Incline un peu la carte' : 'Cadre toute la carte, sans reflet'}
         </p>
         <span className="w-11" />
       </div>
@@ -171,6 +201,12 @@ export function CameraCapture({
             Choisir une photo
           </button>
         </div>
+      )}
+
+      {ready && !error && (
+        <p className="absolute inset-x-0 bottom-[calc(7.5rem+env(safe-area-inset-bottom))] text-center text-xs font-semibold text-white/85">
+          Fond uni · bonne lumière · carte hors protection · numéro net
+        </p>
       )}
 
       <div className="pb-safe absolute inset-x-0 bottom-0 flex items-center justify-around p-6">

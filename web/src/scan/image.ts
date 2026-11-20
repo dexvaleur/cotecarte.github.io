@@ -1,5 +1,5 @@
 // Outils de traitement d'image (dans le navigateur, avec <canvas>).
-import { locateCard } from './locate'
+import { locateCard, type CardBox } from './locate'
 import { adaptiveThreshold } from './threshold'
 
 /** Ratio officiel d'une carte Pokémon : 63 mm × 88 mm. */
@@ -248,4 +248,143 @@ export function sharpness(src: CanvasImageSource & { width: number; height: numb
     }
   }
   return n ? sum2 / n - (sum / n) ** 2 : 0
+}
+
+// ---- Photo difficile : protection rigide, reflets -----------------------------------
+
+/** Repère la carte sur une version réduite de l'image (plus rapide). */
+function locateIn(src: HTMLCanvasElement) {
+  const scale = Math.min(1, 360 / Math.max(src.width, src.height))
+  const W = Math.round(src.width * scale)
+  const H = Math.round(src.height * scale)
+  const small = makeCanvas(W, H)
+  const ctx = small.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(src, 0, 0, W, H)
+  const box = locateCard(ctx.getImageData(0, 0, W, H).data, W, H)
+  return box ? { box, scale, W, H } : null
+}
+
+/** Découpe le rectangle trouvé et le redresse (sign = -1 : retourné à 180°), au rapport donné. */
+function straighten(src: HTMLCanvasElement, box: CardBox, scale: number, sign: 1 | -1, ratio: number): HTMLCanvasElement {
+  const cx = box.cx / scale
+  const cy = box.cy / scale
+  const w = box.w / scale
+  const h = box.h / scale
+  const outW = Math.min(1000, Math.round(w))
+  const outH = Math.round(outW / ratio)
+  const out = makeCanvas(outW, outH)
+  const o = out.getContext('2d')!
+  const ux = box.ux * sign
+  const uy = box.uy * sign
+  const sx = outW / w
+  const sy = outH / h
+  o.setTransform(sx * uy, sy * ux, -sx * ux, sy * uy, outW / 2 - sx * (uy * cx - ux * cy), outH / 2 - sy * (ux * cx + uy * cy))
+  o.imageSmoothingQuality = 'high'
+  o.drawImage(src, 0, 0)
+  return out
+}
+
+function rotate180(c: HTMLCanvasElement): HTMLCanvasElement {
+  const out = makeCanvas(c.width, c.height)
+  const o = out.getContext('2d')!
+  o.translate(c.width, c.height)
+  o.rotate(Math.PI)
+  o.drawImage(c, 0, 0)
+  return out
+}
+
+/**
+ * Carte dans une protection rigide (toploader) ? Le rectangle trouvé est alors un peu trop
+ * large pour une carte (76 × 101 mm au lieu de 63 × 88).
+ */
+export function looksSleeved(src: HTMLCanvasElement): boolean {
+  const f = locateIn(src)
+  return !!f && f.box.quality >= 0.4 && f.box.w / f.box.h > 0.735
+}
+
+/**
+ * Carte dans une protection : on redresse la protection, puis on cherche les 4 bords droits
+ * de la carte à l'intérieur. On connaît sa forme (63 × 88 mm) : on teste toutes les positions
+ * et tailles possibles et on garde celle dont les bords sont les plus marqués.
+ * Renvoie la carte (et sa version retournée), ou null.
+ */
+export function findSleevedCard(src: HTMLCanvasElement, uprightOnly = false): HTMLCanvasElement[] | null {
+  const f = locateIn(src)
+  if (!f || f.box.w / f.box.h <= 0.735) return null
+  const upright: 1 | -1 = f.box.uy < -0.5 ? -1 : 1
+  const sleeve = straighten(src, f.box, f.scale, upright, f.box.w / f.box.h)
+
+  const W = 240
+  const H = Math.round((sleeve.height / sleeve.width) * W)
+  const small = makeCanvas(W, H)
+  const ctx = small.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(sleeve, 0, 0, W, H)
+  const d = ctx.getImageData(0, 0, W, H).data
+  const diff = (a: number, b: number) => Math.abs(d[a] - d[b]) + Math.abs(d[a + 1] - d[b + 1]) + Math.abs(d[a + 2] - d[b + 2])
+  // Force d'un bord vertical à la colonne x (moyenne sur la hauteur utile), idem à l'horizontale.
+  const col = new Float32Array(W)
+  const row = new Float32Array(H)
+  for (let x = 1; x < W - 1; x++) {
+    let sum = 0
+    for (let y = Math.round(H * 0.15); y < H * 0.85; y++) sum += diff((y * W + x - 1) * 4, (y * W + x + 1) * 4)
+    col[x] = sum / (H * 0.7)
+  }
+  for (let y = 1; y < H - 1; y++) {
+    let sum = 0
+    for (let x = Math.round(W * 0.15); x < W * 0.85; x++) sum += diff(((y - 1) * W + x) * 4, ((y + 1) * W + x) * 4)
+    row[y] = sum / (W * 0.7)
+  }
+  const at = (p: Float32Array, i: number) => Math.max(p[i - 1] ?? 0, p[i], p[i + 1] ?? 0)
+  const median = (p: Float32Array) => [...p].sort((a, b) => a - b)[Math.floor(p.length / 2)] || 1
+  const mc = median(col)
+  const mr = median(row)
+  // Meilleure paire de bords pour un écart donné (gauche/droite ou haut/bas).
+  const pair = (p: Float32Array, size: number, n: number) => {
+    let pos = -1
+    let v0 = 0
+    for (let a = 1; a + size < n - 1; a++) {
+      const v = Math.min(at(p, a), at(p, a + size))
+      if (v > v0) [pos, v0] = [a, v]
+    }
+    return { pos, v: v0 }
+  }
+  const options: { x0: number; cw: number; y0: number; ch: number; score: number }[] = []
+  for (let cw = Math.round(W * 0.74); cw <= W * 0.97; cw++) {
+    const x = pair(col, cw, W)
+    if (x.pos < 0) continue
+    // Hauteur ≈ largeur / 0,716, avec un peu de marge (photo un peu de biais).
+    let y = { pos: -1, v: 0, ch: 0 }
+    for (let ch = Math.round((cw / CARD_RATIO) * 0.96); ch <= (cw / CARD_RATIO) * 1.05 && ch < H - 2; ch++) {
+      const r = pair(row, ch, H)
+      if (r.v > y.v) y = { ...r, ch }
+    }
+    if (y.pos < 0) continue
+    options.push({ x0: x.pos, cw, y0: y.pos, ch: y.ch, score: Math.min(x.v / mc, y.v / mr) })
+  }
+  const top = Math.max(0, ...options.map((o) => o.score))
+  if (top < 1.8) return null
+  // Le cadre intérieur de la carte (autour de l'illustration) forme aussi un rectangle net :
+  // parmi les bons candidats, on garde le plus grand, qui est le bord de la carte.
+  const best = options.filter((o) => o.score >= Math.max(1.8, top * 0.6)).sort((a, b) => b.cw - a.cw)[0]
+  const k = sleeve.width / W
+  const outW = Math.min(1000, Math.round(best.cw * k))
+  const card = makeCanvas(outW, Math.round(outW / CARD_RATIO))
+  card.getContext('2d')!.drawImage(sleeve, best.x0 * k, best.y0 * k, best.cw * k, best.ch * k, 0, 0, card.width, card.height)
+  return uprightOnly ? [card] : [card, rotate180(card)]
+}
+
+/**
+ * Part de la carte « brûlée » par un reflet (pixels blancs saturés), de 0 à 1.
+ * Au-delà de ~3 %, le nom ou le numéro risquent d'être illisibles.
+ */
+export function glareRatio(src: CanvasImageSource & { width: number; height: number }): number {
+  const W = 120
+  const H = Math.max(1, Math.round((src.height / src.width) * W))
+  const c = makeCanvas(W, H)
+  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(src, 0, 0, W, H)
+  const d = ctx.getImageData(0, 0, W, H).data
+  let n = 0
+  for (let i = 0; i < W * H; i++) if (d[i * 4] >= 250 && d[i * 4 + 1] >= 250 && d[i * 4 + 2] >= 250) n++
+  return n / (W * H)
 }
