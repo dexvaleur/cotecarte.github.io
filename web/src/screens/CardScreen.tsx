@@ -387,7 +387,7 @@ function Prices({ card }: { card: Card }) {
           <PriceChart points={pts} />
           <p className="text-xs text-muted">
             {daily
-              ? 'Prix de tendance relevé chaque jour par Cote Carte.'
+              ? 'Prix de tendance relevé chaque jour par DexValeur.'
               : 'Moyennes des ventes sur 30 jours, 7 jours et la veille. La courbe jour par jour se remplit au fil des jours.'}
           </p>
         </div>

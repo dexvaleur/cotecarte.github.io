@@ -13,7 +13,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: WEB_ORIGIN
-        value: https://ilyas-celldtyjdy.github.io
+        value: https://dexvaleur.github.io,https://cotecarte.github.io,https://ilyas-celldtyjdy.github.io
       - key: AUTH_SECRET
         generateValue: true
       - key: DATABASE_URL

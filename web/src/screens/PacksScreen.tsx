@@ -277,7 +277,7 @@ function WhereToBuy() {
           jamais à moitié prix.
         </p>
       </div>
-      <p className="mt-2 text-xs text-muted">Cote Carte n’est lié à aucun de ces magasins ou sites et ne touche aucune commission.</p>
+      <p className="mt-2 text-xs text-muted">DexValeur n’est lié à aucun de ces magasins ou sites et ne touche aucune commission.</p>
     </Card>
   )
 }
