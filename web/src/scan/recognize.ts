@@ -88,11 +88,15 @@ const NUMBER_CHARS = '0123456789/'
 
 /** Noms de Pokémon reconnus dans un texte, du plus sûr au moins sûr. */
 function speciesIn(names: string[]): SpeciesMatch[] {
-  return names
+  const found = names
     .slice(0, 5)
     .map((n) => matchSpecies(n, SPECIES))
     .filter((m): m is SpeciesMatch => m !== null)
     .sort((a, b) => b.score - a.score)
+  // Un nom lu à l'identique (« Ogerpon ») : les ressemblances approximatives des autres mots
+  // de la ligne sont du bruit (« Masque » de « Masque Turquoise » ≈ « Masquerain »).
+  if (found[0]?.score >= 0.97) return found.filter((m) => m.score >= 0.97)
+  return found
 }
 
 // Mots toujours imprimés en haut d'une carte (dans le bon sens).
@@ -148,7 +152,10 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     if (views.length > 1) {
       bottom = await readText(band(view, 0.87, 0.995, 0, 0.55), onProgress, NUMBER_CHARS)
       // Seulement un numéro plausible (« 030/106 ») : à l'envers, on lit parfois des chiffres au hasard (« 0/0 »).
-      const plausibleNumber = (t: string) => parseCardNumbers(t).some((n) => n.total && n.total >= 10 && n.total <= 400 && n.num <= n.total * 1.6)
+      // Le numéro doit être isolé : « 0012/7325 » (bruit lu à l'envers) ne compte pas.
+      const plausibleNumber = (t: string) =>
+        /(^|[^\d])\d{1,3}\s?\/\s?\d{2,3}([^\d]|$)/.test(t) &&
+        parseCardNumbers(t).some((n) => n.total && n.total >= 10 && n.total <= 400 && n.num <= n.total * 1.6)
       if (plausibleNumber(bottom)) score += 40
       else if (asian) {
         // Cartes asiatiques : le haut ne se lit pas, donc on regarde de plus près le bas.
@@ -306,6 +313,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   // Petit avantage aux extensions récentes (les plus scannées) pour départager les égalités.
   const sets = await getSets('fr').catch(() => [])
   const recency = new Map(sets.map((s, i) => [s.id, i / Math.max(1, sets.length - 1)]))
+  const officialCount = new Map(sets.map((s) => [s.id, s.cardCount.official]))
   // Position approximative d'une année dans la liste des extensions (1999 → début, cette année → fin).
   const eraOf = (y: number) => Math.min(1, Math.max(0, (y - 1999) / Math.max(1, new Date().getFullYear() - 1999)))
   const candidates: Candidate[] = [...pool.values()].map((c) => {
@@ -325,6 +333,16 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
       sameLocalId(c.localId, readNumber.raw) &&
       (fromNumberSearch || readNumber.total === null)
     const looseMatch = !numberMatch && loose.some((n) => sameLocalId(c.localId, n))
+    // Numéro lu à un chiffre près (« 100/167 » pour « 190/167 »), dans la bonne extension :
+    // fréquent avec un reflet ou une protection en plastique.
+    const nearMatch =
+      !numberMatch &&
+      readNumber !== null &&
+      readNumber.total !== null &&
+      officialCount.get(setIdOf(c.id)) === readNumber.total &&
+      /^\d+$/.test(c.localId) &&
+      c.localId.replace(/^0+/, '').length === String(readNumber.num).length &&
+      levenshtein(c.localId.replace(/^0+/, ''), String(readNumber.num)) === 1
     const cardSuffix = parseSuffix(' ' + c.name.replace(/-/g, ' '))
     // Suffixe lu = même suffixe sur la carte : bonus. Pas de suffixe lu : léger désavantage aux
     // cartes qui en ont un (le logo peut avoir été mal lu, donc seulement un peu).
@@ -340,7 +358,7 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
     const agree = splitCardId(c.id).lang ? 1 : 0.3 + 0.7 * nameScore
     const score =
       nameScore * 2.5 +
-      (numberMatch ? 1.5 : looseMatch ? 0.4 : 0) * agree +
+      (numberMatch ? 1.5 : nearMatch ? 0.8 : looseMatch ? 0.4 : 0) * agree +
       (fromNumberSearch ? 1 : 0) * agree +
       suffixBonus +
       megaBonus +
@@ -354,7 +372,8 @@ export async function recognizeCard(views: HTMLCanvasElement[], onProgress?: Ocr
   // On garde les meilleurs, puis on compare époque et images pour les départager.
   // Nom sûr mais numéro illisible : on garde toutes les versions de la carte (jusqu'à 30),
   // l'utilisateur choisira (ou tapera le numéro pour filtrer).
-  const strict = candidates.some((c) => c.numberMatch)
+  // Un numéro dont la carte ne porte pas le nom lu est sans doute mal lu : on garde la liste large.
+  const strict = candidates.some((c) => c.numberMatch && c.nameScore >= 0.6)
   const limit = species.length && !strict ? 30 : 10
   // L'année du copyright départage d'abord une liste plus large : une extension récente pleine
   // de Pikachu ne doit pas cacher le Pikachu de 1999 qu'on a en main.
