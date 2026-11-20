@@ -55,7 +55,7 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding: () 
 
       <Card className="mt-4">
         <button onClick={onReplayOnboarding} className="flex w-full items-center gap-3 font-semibold">
-          <RotateCcw size={20} className="text-primary" /> Revoir la présentation
+          <RotateCcw size={20} className="text-primary" /> Revoir le guide de Dexy
         </button>
       </Card>
 

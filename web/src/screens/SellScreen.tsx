@@ -36,7 +36,7 @@ export function SellScreen() {
         <h1 className="text-2xl font-extrabold tracking-tight">Vendre</h1>
       </div>
 
-      <div role="tablist" className="mb-4 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1">
+      <div role="tablist" data-tour="sell-tabs" className="mb-4 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1">
         {(
           [
             ['annonces', 'Annonces', Store],
@@ -66,6 +66,7 @@ export function SellScreen() {
       {view !== 'messages' && (
         <Link
           to="/vendre/nouvelle"
+          data-tour="sell-new"
           className="fixed right-4 bottom-[calc(80px+env(safe-area-inset-bottom))] z-10 flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 font-bold text-primary-ink shadow-lg active:scale-95 sm:right-[calc(50%-17rem)]"
         >
           <Plus size={20} /> Vendre une carte
@@ -149,7 +150,7 @@ function Feed() {
 
   return (
     <>
-      <form onSubmit={submit} className="relative mb-3">
+      <form onSubmit={submit} data-tour="sell-search" className="relative mb-3">
         <Search size={18} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" />
         <input
           type="search"

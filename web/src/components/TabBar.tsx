@@ -23,6 +23,7 @@ export function TabBar() {
           <li key={to} className="flex-1">
             <NavLink
               to={to}
+              data-tour={`tab-${to.slice(1)}`}
               className={({ isActive }) =>
                 `flex flex-col items-center gap-0.5 py-2 text-[10.5px] font-semibold transition-colors ${
                   isActive ? 'text-primary' : 'text-muted'

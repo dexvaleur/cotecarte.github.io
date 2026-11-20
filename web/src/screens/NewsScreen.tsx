@@ -68,7 +68,7 @@ export function NewsSection() {
   return (
     <>
       {(movers.up.length > 0 || movers.down.length > 0) && (
-        <section className="mt-6">
+        <section className="mt-6" data-tour="packs-movers">
           <h2 className="text-lg font-extrabold">💶 Prix de la semaine</h2>
           <p className="mb-2 text-sm text-muted">Prix moyen des 7 derniers jours comparé à celui du mois (Cardmarket, cartes à 5 € ou plus).</p>
           <Movers title="En hausse" Icon={TrendingUp} tone="text-good" items={movers.up} owned={owned} wished={wished} />
@@ -76,7 +76,9 @@ export function NewsSection() {
         </section>
       )}
 
-      <h2 className="mt-6 mb-2 text-lg font-extrabold">📰 Articles</h2>
+      <h2 className="mt-6 mb-2 text-lg font-extrabold" data-tour="packs-news">
+        📰 Articles
+      </h2>
       {articles.length > 0 ? (
         <div className="space-y-2">
           {articles.map((a) => (

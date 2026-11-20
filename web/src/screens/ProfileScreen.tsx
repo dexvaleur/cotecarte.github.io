@@ -65,7 +65,7 @@ export function ProfileScreen() {
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-primary-soft to-surface">
+      <div data-tour="profile-avatar" className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-primary-soft to-surface">
         <div className="pointer-events-none absolute -top-10 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-surface/70 blur-2xl" />
         <AvatarView a={profile.avatar} crop="bust" className="relative mx-auto -mb-px block h-64 w-auto pt-4" />
         <Link
@@ -76,7 +76,7 @@ export function ProfileScreen() {
         </Link>
       </div>
 
-      <Card className="mt-4">
+      <Card className="mt-4" data-tour="profile-pseudo">
         {editing ? (
           <form onSubmit={savePseudo} className="flex gap-2">
             <label className="sr-only" htmlFor="pseudo">
@@ -112,7 +112,7 @@ export function ProfileScreen() {
       </Card>
 
       <h2 className="mt-6 mb-2 text-lg font-extrabold">Mes chiffres</h2>
-      <dl className="grid grid-cols-3 gap-2 text-center">
+      <dl data-tour="profile-stats" className="grid grid-cols-3 gap-2 text-center">
         <Stat label="Cartes" value={String(stats.cards)} />
         <Stat label="Cartes différentes" value={String(stats.distinct)} />
         <Stat label="Valeur" value={formatEurCompact(stats.value)} />

@@ -8,6 +8,7 @@ import { CardImage } from '../components/CardThumb'
 import { OwnedCopies } from '../components/OwnedCopies'
 import { AddToBinder } from './Binders'
 import { logFailedScan } from '../lib/scanLog'
+import { maybeStartCardTour } from '../lib/tour'
 import { forgetScan, hasMyPhoto, recentScan, removeMyPhoto, saveMyPhotoFromDataUrl, saveMyPhotoFromFile } from '../lib/myPhotos'
 import { type Answers, ConditionCheck, ConditionResult, gradeFromAnswers } from '../components/ConditionCheck'
 import { PriceChart } from '../components/PriceChart'
@@ -91,6 +92,12 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
   const grade = gradeFromAnswers(answers)
   const gen = generationOf(card.dexId?.[0])
   const setInfo = set ?? card.set
+
+  // La première fois qu'on ouvre une fiche, Dexy explique les infos de la carte.
+  useEffect(() => {
+    const t = setTimeout(maybeStartCardTour, 900)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -189,7 +196,7 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
             {card.types?.map((t) => <TypeChip key={t} type={t} />)}
             {card.hp && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-bold">{card.hp} PV</span>}
           </div>
-          <div className="mt-3">
+          <div className="mt-3" data-tour="card-price">
             <p className="text-xs font-semibold text-muted">Prix du marché</p>
             <p className="text-3xl font-extrabold">{formatEur(ref)}</p>
             <Change card={card} />
@@ -216,7 +223,7 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       </a>
 
       {/* Rareté */}
-      <Box>
+      <Box data-tour="card-rarity">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-bold">Rareté</h2>
           <span className="flex gap-1" aria-label={`Niveau de rareté ${rarity.level} sur 5`}>
@@ -233,7 +240,7 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       <Prices card={card} />
 
       {/* État */}
-      <Box>
+      <Box data-tour="card-condition">
         <h2 className="font-bold">Dans quel état est ta carte ?</h2>
         <p className="mb-3 text-sm text-muted">
           Les prix ci-dessus sont pour une carte Near Mint (quasi parfaite). Réponds à 4 questions pour estimer l’état de la tienne.
@@ -311,7 +318,9 @@ function CardDetail({ card, set, stale, fetchedAt }: { card: Card; set: SetDetai
       )}
 
       {/* Barre d'actions, collée au-dessus des onglets */}
-      <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-xl gap-2 bg-gradient-to-t from-bg via-bg/95 to-transparent px-4 pt-4 pb-2">
+      <div
+        data-tour="card-actions"
+        className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-xl gap-2 bg-gradient-to-t from-bg via-bg/95 to-transparent px-4 pt-4 pb-2">
         <button onClick={add} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 font-bold text-primary-ink shadow-lg active:scale-[.98]">
           <Plus size={20} /> Ajouter à ma collection
         </button>
@@ -380,14 +389,14 @@ function Prices({ card }: { card: Card }) {
   const pts = daily ? history : chartPoints(card)
   if (!cm.length && !tp.length) {
     return (
-      <Box>
+      <Box data-tour="card-prices">
         <h2 className="font-bold">Prix</h2>
         <p className="text-muted">Aucun prix connu pour cette carte : elle se vend rarement, ou n’est pas listée sur Cardmarket ni TCGplayer.</p>
       </Box>
     )
   }
   return (
-    <Box>
+    <Box data-tour="card-prices">
       <h2 className="font-bold">Prix</h2>
       {pts.length >= 2 && (
         <div className="mt-2">

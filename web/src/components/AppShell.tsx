@@ -1,11 +1,14 @@
-import { BookOpen, Settings, WifiOff } from 'lucide-react'
-import { Link, Outlet } from 'react-router'
+import { BookOpen, CircleHelp, Settings, WifiOff } from 'lucide-react'
+import { Link, Outlet, useLocation } from 'react-router'
+import { sectionFor, startTour } from '../lib/tour'
 import { useOnline } from '../lib/useOnline'
 import { TabBar } from './TabBar'
+import { Tour } from './Tour'
 
 /** Structure commune à tous les écrans : en-tête, contenu, barre d'onglets. */
 export function AppShell() {
   const online = useOnline()
+  const section = sectionFor(useLocation().pathname)
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
@@ -18,8 +21,19 @@ export function AppShell() {
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-1">
+            {section && (
+              <button
+                onClick={() => startTour(section)}
+                aria-label="Aide : expliquer cet écran"
+                data-tour="header-help"
+                className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-2"
+              >
+                <CircleHelp size={20} />
+              </button>
+            )}
             <Link
               to="/glossaire"
+              data-tour="header-glossary"
               aria-label="Glossaire"
               className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-2"
             >
@@ -27,6 +41,7 @@ export function AppShell() {
             </Link>
             <Link
               to="/reglages"
+              data-tour="header-settings"
               aria-label="Réglages"
               className="grid h-10 w-10 place-items-center rounded-full text-muted hover:bg-surface-2"
             >
@@ -46,6 +61,7 @@ export function AppShell() {
       </main>
 
       <TabBar />
+      <Tour />
     </div>
   )
 }

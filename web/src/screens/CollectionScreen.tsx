@@ -56,15 +56,17 @@ export function CollectionScreen() {
   return (
     <>
       <ScreenTitle title="Ma collection" />
-      <ValueCard total={total} count={count} loading={loading} />
+      <div data-tour="col-value">
+        <ValueCard total={total} count={count} loading={loading} />
+      </div>
 
       {!session && (
-        <Card className="mt-3">
+        <Card className="mt-3" data-tour="col-account">
           <AccountPanel compact />
         </Card>
       )}
 
-      <div role="tablist" className="mt-4 grid grid-cols-4 gap-1 rounded-2xl bg-surface-2 p-1 text-xs font-semibold">
+      <div role="tablist" data-tour="col-tabs" className="mt-4 grid grid-cols-4 gap-1 rounded-2xl bg-surface-2 p-1 text-xs font-semibold">
         {(
           [
             ['cards', `Cartes (${count})`],
@@ -92,7 +94,7 @@ export function CollectionScreen() {
         {tab === 'wish' && <Wishlist />}
       </div>
       {session && (
-        <div className="mt-6">
+        <div className="mt-6" data-tour="col-account">
           <AccountPanel compact />
         </div>
       )}
@@ -115,7 +117,7 @@ function Empty({ loggedIn }: { loggedIn: boolean }) {
         </Link>
       </Card>
       {!loggedIn && (
-        <Card className="mt-4">
+        <Card className="mt-4" data-tour="col-account">
           <AccountPanel compact />
         </Card>
       )}
